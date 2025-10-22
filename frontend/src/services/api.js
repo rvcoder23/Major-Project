@@ -82,6 +82,20 @@ export const accountsAPI = {
     getChartData: (period = '7') => api.get(`/accounts/chart-data?period=${period}`),
 };
 
+// Food API
+export const foodAPI = {
+    getMenu: () => api.get('/food/menu'),
+    createMenuItem: (data) => api.post('/food/menu', data),
+    updateMenuItem: (id, data) => api.put(`/food/menu/${id}`, data),
+    deleteMenuItem: (id) => api.delete(`/food/menu/${id}`),
+    getOrders: () => api.get('/food/orders'),
+    createOrder: (data) => api.post('/food/orders', data),
+    updateOrderStatus: (id, status) => api.patch(`/food/orders/${id}/status`, { status }),
+    getTodayOrders: () => api.get('/food/orders/today'),
+    getTodayRevenue: () => api.get('/food/revenue/today'),
+    getCategories: () => api.get('/food/categories'),
+};
+
 // Reports API
 export const reportsAPI = {
     getDashboard: () => api.get('/reports/dashboard'),

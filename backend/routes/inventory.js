@@ -26,7 +26,8 @@ router.get('/', async (req, res) => {
 router.post('/', [
     body('item_name').notEmpty().withMessage('Item name is required'),
     body('quantity').isInt().withMessage('Quantity must be a number'),
-    body('threshold').isInt().withMessage('Threshold must be a number')
+    body('threshold').isInt().withMessage('Threshold must be a number'),
+    body('price').isNumeric().withMessage('Price must be a number')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -54,7 +55,8 @@ router.post('/', [
 router.put('/:id', [
     body('item_name').optional().notEmpty(),
     body('quantity').optional().isInt(),
-    body('threshold').optional().isInt()
+    body('threshold').optional().isInt(),
+    body('price').optional().isNumeric()
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -117,7 +119,7 @@ router.get('/low-stock', async (req, res) => {
 // Add stock (purchase)
 router.post('/:id/add-stock', [
     body('quantity').isInt().withMessage('Quantity must be a number'),
-    body('total_cost').isNumeric().withMessage('Total cost must be a number')
+    body('total_cost').optional().isNumeric().withMessage('Total cost must be a number')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -125,16 +127,21 @@ router.post('/:id/add-stock', [
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
-        // Update inventory quantity
+        // Read current quantity and price
         const { data: inventoryData, error: inventoryError } = await supabase
             .from('inventory')
-            .select('quantity')
+            .select('quantity, price')
             .eq('id', req.params.id)
             .single();
 
         if (inventoryError) throw inventoryError;
 
-        const newQuantity = inventoryData.quantity + req.body.quantity;
+        const qtyToAdd = Number(req.body.quantity);
+        const unitPrice = Number(inventoryData.price || 0);
+        const computedTotal = qtyToAdd * unitPrice;
+        const finalTotalCost = typeof req.body.total_cost === 'number' ? req.body.total_cost : computedTotal;
+
+        const newQuantity = inventoryData.quantity + qtyToAdd;
 
         const { data, error } = await supabase
             .from('inventory')
@@ -153,8 +160,8 @@ router.post('/:id/add-stock', [
             .from('purchases')
             .insert([{
                 item_id: req.params.id,
-                quantity: req.body.quantity,
-                total_cost: req.body.total_cost
+                quantity: qtyToAdd,
+                total_cost: finalTotalCost
             }]);
 
         await logAction(`Stock added to inventory item: ${req.params.id}`, 'admin', supabase);

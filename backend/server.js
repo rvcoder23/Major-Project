@@ -12,6 +12,7 @@ const roomsRoutes = require('./routes/rooms');
 const bookingsRoutes = require('./routes/bookings');
 const housekeepingRoutes = require('./routes/housekeeping');
 const inventoryRoutes = require('./routes/inventory');
+const foodRoutes = require('./routes/food');
 const accountsRoutes = require('./routes/accounts');
 const reportsRoutes = require('./routes/reports');
 
@@ -40,6 +41,7 @@ app.use('/api/rooms', roomsRoutes);
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/housekeeping', housekeepingRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/food', foodRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/reports', reportsRoutes);
 

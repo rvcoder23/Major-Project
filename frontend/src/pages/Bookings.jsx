@@ -72,6 +72,16 @@ const Bookings = () => {
             return;
         }
 
+        // Frontend strict validation for phone and Aadhaar
+        if (!/^\d{10}$/.test(newBooking.phone_number)) {
+            alert('Phone number must be exactly 10 digits');
+            return;
+        }
+        if (!/^\d{12}$/.test(newBooking.aadhar_number)) {
+            alert('Aadhaar number must be exactly 12 digits');
+            return;
+        }
+
         try {
             const response = await bookingsAPI.create(newBooking);
             if (response.success) {
@@ -86,8 +96,12 @@ const Bookings = () => {
                     payment_status: 'Pending'
                 });
                 fetchBookings();
+                // Refresh rooms so the booked room disappears if it became occupied
+                fetchRooms();
             }
         } catch (error) {
+            // Show pop-up error from backend (e.g., overlap or validation)
+            alert(error?.response?.data?.error || 'Error creating booking');
             console.error('Error creating booking:', error);
         }
     };
@@ -119,8 +133,12 @@ const Bookings = () => {
     };
 
     const filteredBookings = bookings.filter(booking => {
-        const matchesSearch = booking.guest_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            booking.rooms?.room_number.toLowerCase().includes(searchTerm.toLowerCase());
+        const roomNumber = booking.rooms?.room_number?.toString?.() || '';
+        const phone = booking.phone_number || '';
+        const term = searchTerm.toLowerCase();
+        const matchesSearch = booking.guest_name.toLowerCase().includes(term) ||
+            roomNumber.toLowerCase().includes(term) ||
+            phone.toLowerCase().includes(term);
         const matchesStatus = !statusFilter || booking.booking_status === statusFilter;
         return matchesSearch && matchesStatus;
     });
@@ -403,10 +421,16 @@ const Bookings = () => {
                                     <input
                                         type="tel"
                                         required
-                                        placeholder="+91-9876543210"
-                                        pattern="[+]?[0-9]{10,15}"
+                                        placeholder="9876543210"
+                                        pattern="[0-9]{10}"
+                                        maxLength="10"
                                         value={newBooking.phone_number}
-                                        onChange={(e) => setNewBooking({ ...newBooking, phone_number: e.target.value })}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            if (value.length <= 10) {
+                                                setNewBooking({ ...newBooking, phone_number: value });
+                                            }
+                                        }}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                                     />
                                 </div>

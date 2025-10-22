@@ -57,7 +57,7 @@ router.get('/:id', async (req, res) => {
 // Create new booking
 router.post('/', [
     body('guest_name').notEmpty().withMessage('Guest name is required'),
-    body('phone_number').matches(/^[+]?[0-9]{10,15}$/).withMessage('Valid phone number is required'),
+    body('phone_number').matches(/^[0-9]{10}$/).withMessage('Phone number must be exactly 10 digits'),
     body('aadhar_number').matches(/^[0-9]{12}$/).withMessage('Valid 12-digit Aadhar number is required'),
     body('room_id').isInt().withMessage('Room ID must be a number'),
     body('check_in').isISO8601().withMessage('Check-in date is required'),
@@ -69,6 +69,48 @@ router.post('/', [
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
+        // Normalize dates to YYYY-MM-DD (date-only) strings
+        const checkInStr = new Date(req.body.check_in).toISOString().split('T')[0];
+        const checkOutStr = new Date(req.body.check_out).toISOString().split('T')[0];
+
+        if (checkOutStr <= checkInStr) {
+            return res.status(400).json({ success: false, error: 'Check-out must be after check-in' });
+        }
+
+        // Prevent overlapping booking for the same room
+        const { data: overlappingRoomBookings, error: overlapErr } = await supabase
+            .from('bookings')
+            .select('id, guest_name, check_in, check_out, booking_status')
+            .eq('room_id', req.body.room_id)
+            .neq('booking_status', 'Cancelled')
+            .lt('check_in', checkOutStr)
+            .gt('check_out', checkInStr);
+
+        if (overlapErr) throw overlapErr;
+        if (overlappingRoomBookings && overlappingRoomBookings.length > 0) {
+            return res.status(409).json({
+                success: false,
+                error: 'Room is already booked for the selected dates'
+            });
+        }
+
+        // Prevent duplicate active booking for same guest by phone/Aadhaar overlapping in time
+        const { data: overlappingGuestBookings, error: guestOverlapErr } = await supabase
+            .from('bookings')
+            .select('id')
+            .neq('booking_status', 'Cancelled')
+            .or(`phone_number.eq.${req.body.phone_number},aadhar_number.eq.${req.body.aadhar_number}`)
+            .lt('check_in', checkOutStr)
+            .gt('check_out', checkInStr);
+
+        if (guestOverlapErr) throw guestOverlapErr;
+        if (overlappingGuestBookings && overlappingGuestBookings.length > 0) {
+            return res.status(409).json({
+                success: false,
+                error: 'Guest already has an active booking during the selected dates'
+            });
+        }
+
         // Calculate total amount
         const { data: roomData } = await supabase
             .from('rooms')
@@ -76,13 +118,15 @@ router.post('/', [
             .eq('id', req.body.room_id)
             .single();
 
-        const checkIn = new Date(req.body.check_in);
-        const checkOut = new Date(req.body.check_out);
+        const checkIn = new Date(checkInStr);
+        const checkOut = new Date(checkOutStr);
         const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
         const totalAmount = nights * roomData.rate_per_night;
 
         const bookingData = {
             ...req.body,
+            check_in: checkInStr,
+            check_out: checkOutStr,
             total_amount: totalAmount
         };
 
@@ -118,7 +162,7 @@ router.post('/', [
 // Update booking
 router.put('/:id', [
     body('guest_name').optional().notEmpty(),
-    body('phone_number').optional().matches(/^[+]?[0-9]{10,15}$/),
+    body('phone_number').optional().matches(/^[0-9]{10}$/),
     body('aadhar_number').optional().matches(/^[0-9]{12}$/),
     body('room_id').optional().isInt(),
     body('check_in').optional().isISO8601(),

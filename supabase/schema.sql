@@ -42,7 +42,8 @@ CREATE TABLE inventory (
   quantity INTEGER DEFAULT 0,
   supplier_name VARCHAR(100),
   last_refilled DATE DEFAULT CURRENT_DATE,
-  threshold INTEGER DEFAULT 5
+  threshold INTEGER DEFAULT 5,
+  price DECIMAL(10,2) DEFAULT 0
 );
 
 -- 5. Purchases Table
@@ -128,13 +129,13 @@ INSERT INTO food_menu (item_name, category, price) VALUES
 ('Tea', 'Beverage', 30.00),
 ('Coffee', 'Beverage', 40.00);
 
-INSERT INTO inventory (item_name, quantity, supplier_name, threshold) VALUES
-('Towels', 50, 'Textile Suppliers', 10),
-('Soap', 100, 'Personal Care Co.', 20),
-('Shampoo', 80, 'Personal Care Co.', 15),
-('Toilet Paper', 200, 'Paper Products Ltd.', 50),
-('Bed Sheets', 60, 'Textile Suppliers', 12),
-('Pillows', 40, 'Textile Suppliers', 8);
+INSERT INTO inventory (item_name, quantity, supplier_name, threshold, price) VALUES
+('Towels', 50, 'Textile Suppliers', 10, 120.00),
+('Soap', 100, 'Personal Care Co.', 20, 20.00),
+('Shampoo', 80, 'Personal Care Co.', 15, 60.00),
+('Toilet Paper', 200, 'Paper Products Ltd.', 50, 15.00),
+('Bed Sheets', 60, 'Textile Suppliers', 12, 400.00),
+('Pillows', 40, 'Textile Suppliers', 8, 300.00);
 
 -- Create indexes for better performance
 CREATE INDEX idx_rooms_status ON rooms(status);
