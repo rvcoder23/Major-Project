@@ -49,7 +49,7 @@ app.use('/api/reports', reportsRoutes);
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'OK',
-        message: 'Hotel Management System API is running',
+        message: 'Front Office Management System API is running',
         timestamp: new Date().toISOString()
     });
 });
@@ -70,7 +70,7 @@ app.use('*', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Hotel Management System Server running on port ${PORT}`);
+    console.log(`🚀 Front Office Management System Server running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 API URL: http://localhost:${PORT}/api`);
 });

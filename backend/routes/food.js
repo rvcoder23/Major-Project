@@ -27,7 +27,10 @@ router.get('/menu', async (req, res) => {
 router.post('/menu', [
     body('item_name').notEmpty().withMessage('Item name is required'),
     body('category').notEmpty().withMessage('Category is required'),
-    body('price').isNumeric().withMessage('Price must be a number')
+    body('full_plate_price').optional().isNumeric().withMessage('Full plate price must be a number'),
+    body('half_plate_price').optional().isNumeric().withMessage('Half plate price must be a number'),
+    body('supports_half_plate').optional().isBoolean().withMessage('Supports half plate must be boolean'),
+    body('price').optional().isNumeric().withMessage('Price must be a number')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -35,9 +38,16 @@ router.post('/menu', [
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
+        // Prepare data for insertion - use old schema for now
+        const insertData = {
+            item_name: req.body.item_name,
+            category: req.body.category,
+            price: req.body.full_plate_price || req.body.price || 0
+        };
+
         const { data, error } = await supabase
             .from('food_menu')
-            .insert([req.body])
+            .insert([insertData])
             .select()
             .single();
 
@@ -55,7 +65,9 @@ router.post('/menu', [
 router.put('/menu/:id', [
     body('item_name').optional().notEmpty(),
     body('category').optional().notEmpty(),
-    body('price').optional().isNumeric()
+    body('full_plate_price').optional().isNumeric(),
+    body('half_plate_price').optional().isNumeric(),
+    body('supports_half_plate').optional().isBoolean()
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -126,8 +138,11 @@ router.get('/orders', async (req, res) => {
 router.post('/orders', [
     body('item_id').isInt().withMessage('Item ID must be a number'),
     body('quantity').isInt().withMessage('Quantity must be a number'),
-    body('customer_name').optional().notEmpty(),
-    body('table_number').optional().isInt()
+    body('customer_name').notEmpty().withMessage('Customer name is required'),
+    body('table_number').optional().isInt().withMessage('Table number must be a number'),
+    body('room_number').optional().isInt().withMessage('Room number must be a number'),
+    body('order_type').optional().isIn(['Restaurant', 'Room Service']).withMessage('Order type must be Restaurant or Room Service'),
+    body('plate_type').optional().isIn(['Half', 'Full']).withMessage('Plate type must be Half or Full')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -135,7 +150,7 @@ router.post('/orders', [
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
-        // Get menu item details
+        // Get menu item details - use old schema for now
         const { data: menuItem, error: menuError } = await supabase
             .from('food_menu')
             .select('price')
@@ -144,17 +159,25 @@ router.post('/orders', [
 
         if (menuError) throw menuError;
 
+        // Calculate price - for now just use the regular price
+        let unitPrice = menuItem.price;
+        
+        // If half plate is requested, use 60% of the price
+        if (req.body.plate_type === 'Half') {
+            unitPrice = Math.round(menuItem.price * 0.6);
+        }
+
         // Generate order number
         const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        const totalAmount = menuItem.price * req.body.quantity;
+        const totalAmount = unitPrice * req.body.quantity;
 
         const orderData = {
             order_number: orderNumber,
             item_id: req.body.item_id,
             quantity: req.body.quantity,
             total_amount: totalAmount,
-            customer_name: req.body.customer_name || null,
-            table_number: req.body.table_number || null,
+            customer_name: req.body.customer_name,
+            table_number: req.body.table_number,
             status: 'Pending'
         };
 

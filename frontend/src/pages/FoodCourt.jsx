@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Utensils, Plus, Search, ShoppingCart, Receipt, ChefHat, Edit, Trash2, Clock, CheckCircle, XCircle, Eye, DollarSign } from 'lucide-react';
+import { Utensils, Plus, Search, ShoppingCart, Receipt, ChefHat, Edit, Trash2, Clock, CheckCircle, XCircle, Eye, IndianRupee } from 'lucide-react';
 import { foodAPI } from '../services/api';
 
 const FoodCourt = () => {
@@ -26,7 +26,8 @@ const FoodCourt = () => {
         item_id: '',
         quantity: 1,
         customer_name: '',
-        table_number: ''
+        table_number: 1,
+        plate_type: 'Full'
     });
 
     useEffect(() => {
@@ -85,7 +86,11 @@ const FoodCourt = () => {
                 price: item.price
             });
         } else {
-            setMenuForm({ item_name: '', category: '', price: 0 });
+            setMenuForm({ 
+                item_name: '', 
+                category: '', 
+                price: 0
+            });
         }
         setShowMenuModal(true);
     };
@@ -96,10 +101,17 @@ const FoodCourt = () => {
                 item_id: item.id,
                 quantity: 1,
                 customer_name: '',
-                table_number: ''
+                table_number: 1,
+                plate_type: 'Full'
             });
         } else {
-            setOrderForm({ item_id: '', quantity: 1, customer_name: '', table_number: '' });
+            setOrderForm({ 
+                item_id: '', 
+                quantity: 1, 
+                customer_name: '', 
+                table_number: 1, 
+                plate_type: 'Full' 
+            });
         }
         setShowOrderModal(true);
     };
@@ -116,6 +128,7 @@ const FoodCourt = () => {
             const res = await foodAPI.createMenuItem(payload);
             if (res.success) {
                 setShowMenuModal(false);
+                setMenuForm({ item_name: '', category: '', price: 0 });
                 fetchAll();
             }
         } catch (err) {
@@ -129,13 +142,21 @@ const FoodCourt = () => {
             const payload = {
                 item_id: Number(orderForm.item_id),
                 quantity: Number(orderForm.quantity),
-                customer_name: orderForm.customer_name.trim() || null,
-                table_number: orderForm.table_number ? Number(orderForm.table_number) : null
+                customer_name: orderForm.customer_name.trim(),
+                table_number: Number(orderForm.table_number),
+                plate_type: orderForm.plate_type
             };
             
             const res = await foodAPI.createOrder(payload);
             if (res.success) {
                 setShowOrderModal(false);
+                setOrderForm({ 
+                    item_id: '', 
+                    quantity: 1, 
+                    customer_name: '', 
+                    table_number: 1, 
+                    plate_type: 'Full' 
+                });
                 fetchAll();
             }
         } catch (err) {
@@ -239,7 +260,7 @@ const FoodCourt = () => {
 
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex items-center">
-                        <Receipt className="h-8 w-8 text-blue-500 mr-3" />
+                    <IndianRupee className="h-8 w-8 text-blue-500 mr-3" />
                         <div>
                             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Today's Revenue</p>
                             <p className="text-2xl font-bold text-gray-900 dark:text-white">₹{revenue.total_revenue}</p>
@@ -364,7 +385,8 @@ const FoodCourt = () => {
                                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Item</th>
                                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Quantity</th>
                                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Customer</th>
-                                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Table</th>
+                                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Location</th>
+                                        <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Plate</th>
                                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Amount</th>
                                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Status</th>
                                         <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Time</th>
@@ -378,7 +400,12 @@ const FoodCourt = () => {
                                             <td className="py-3 px-4 text-gray-900 dark:text-white">{order.food_menu?.item_name}</td>
                                             <td className="py-3 px-4 text-gray-900 dark:text-white">{order.quantity}</td>
                                             <td className="py-3 px-4 text-gray-900 dark:text-white">{order.customer_name || '-'}</td>
-                                            <td className="py-3 px-4 text-gray-900 dark:text-white">{order.table_number || '-'}</td>
+                                            <td className="py-3 px-4 text-gray-900 dark:text-white">
+                                                {order.order_type === 'Room Service' 
+                                                    ? `Room ${order.room_number}` 
+                                                    : `Table ${order.table_number}`}
+                                            </td>
+                                            <td className="py-3 px-4 text-gray-900 dark:text-white">{order.plate_type || 'Full'}</td>
                                             <td className="py-3 px-4 text-gray-900 dark:text-white">₹{order.total_amount}</td>
                                             <td className="py-3 px-4">
                                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
@@ -585,6 +612,18 @@ const FoodCourt = () => {
                                     </select>
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Plate Type</label>
+                                    <select
+                                        required
+                                        value={orderForm.plate_type}
+                                        onChange={(e) => setOrderForm({ ...orderForm, plate_type: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="Full">Full Plate</option>
+                                        <option value="Half">Half Plate (60% price)</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
                                     <input
                                         type="number"
@@ -596,19 +635,21 @@ const FoodCourt = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Name (Optional)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Name</label>
                                     <input
                                         type="text"
+                                        required
                                         value={orderForm.customer_name}
                                         onChange={(e) => setOrderForm({ ...orderForm, customer_name: e.target.value })}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Table Number (Optional)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Table Number</label>
                                     <input
                                         type="number"
                                         min="1"
+                                        required
                                         value={orderForm.table_number}
                                         onChange={(e) => setOrderForm({ ...orderForm, table_number: e.target.value })}
                                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -666,8 +707,20 @@ const FoodCourt = () => {
                                     <p className="text-gray-900 dark:text-white">{selectedOrder.customer_name || 'Walk-in'}</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Table</label>
-                                    <p className="text-gray-900 dark:text-white">{selectedOrder.table_number || 'N/A'}</p>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Order Type</label>
+                                    <p className="text-gray-900 dark:text-white">{selectedOrder.order_type || 'Restaurant'}</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {selectedOrder.order_type === 'Room Service' 
+                                            ? `Room ${selectedOrder.room_number}` 
+                                            : `Table ${selectedOrder.table_number}`}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Plate Type</label>
+                                    <p className="text-gray-900 dark:text-white">{selectedOrder.plate_type || 'Full'}</p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Amount</label>

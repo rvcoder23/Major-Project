@@ -9,7 +9,7 @@ import {
     Users,
     Package,
     Utensils,
-    DollarSign,
+    IndianRupee,
     BarChart3,
     Settings,
     LogOut,
@@ -34,7 +34,7 @@ const Layout = ({ children }) => {
         { name: 'Housekeeping', href: '/housekeeping', icon: Users },
         { name: 'Inventory', href: '/inventory', icon: Package },
         { name: 'Food Court', href: '/food-court', icon: Utensils },
-        { name: 'Accounts', href: '/accounts', icon: DollarSign },
+        { name: 'Accounts', href: '/accounts', icon: IndianRupee },
         { name: 'Reports', href: '/reports', icon: BarChart3 },
         { name: 'Settings', href: '/settings', icon: Settings },
     ];
@@ -54,10 +54,10 @@ const Layout = ({ children }) => {
                     <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
                         <div className="flex items-center">
                             <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-sm">HMS</span>
+                                <span className="text-white font-bold text-sm">FOM</span>
                             </div>
                             <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-white">
-                                Hotel Management
+                                Front Office Management
                             </span>
                         </div>
                         <button

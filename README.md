@@ -1,6 +1,6 @@
-# Hotel Management System
+# Front Office Management System
 
-एक पूर्ण Hotel Management System जो MERN stack और Supabase का उपयोग करता है।
+एक पूर्ण Front Office Management System जो MERN stack और Supabase का उपयोग करता है।
 
 ## 🚀 Features
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, Eye, Clock, User, Bed, DollarSign, Calendar as CalendarIcon, Grid, List, Phone } from 'lucide-react';
+import { Calendar, Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, Eye, Clock, User, Bed, IndianRupee, Calendar as CalendarIcon, Grid, List, Phone } from 'lucide-react';
 import { bookingsAPI, roomsAPI } from '../services/api';
 import BookingCalendar from '../components/BookingCalendar';
 
@@ -340,7 +340,7 @@ const Bookings = () => {
                                             </td>
                                             <td className="py-3 px-4">
                                                 <div className="flex items-center">
-                                                    <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
+                                                    <IndianRupee className="h-4 w-4 text-gray-400 mr-2" />
                                                     <span className="text-gray-900 dark:text-white">₹{booking.total_amount}</span>
                                                 </div>
                                             </td>

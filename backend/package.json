@@ -1,7 +1,7 @@
 {
-    "name": "hotel-management-backend",
+    "name": "front-office-management-backend",
     "version": "1.0.0",
-    "description": "Backend server for Hotel Management System",
+    "description": "Backend server for Front Office Management System",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",

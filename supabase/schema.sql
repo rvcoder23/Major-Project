@@ -1,5 +1,5 @@
 -- =========================
--- HOTEL MANAGEMENT DATABASE
+-- FRONT OFFICE MANAGEMENT DATABASE
 -- =========================
 
 -- 1. Rooms Table
@@ -70,6 +70,8 @@ CREATE TABLE food_orders (
   item_id INTEGER REFERENCES food_menu(id),
   quantity INTEGER,
   total_amount DECIMAL(10,2),
+  customer_name VARCHAR(100),
+  table_number INTEGER,
   order_date TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'Pending'
 );

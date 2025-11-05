@@ -1,7 +1,7 @@
 {
-    "name": "hotel-management-system",
+    "name": "front-office-management",
     "version": "1.0.0",
-    "description": "Complete Hotel Management System using MERN + Supabase",
+    "description": "Complete Front Office Management System using MERN + Supabase",
     "main": "server.js",
     "scripts": {
         "dev": "concurrently \"npm run server\" \"npm run client\"",

@@ -1,5 +1,5 @@
 @echo off
-echo 🏨 Hotel Management System Setup
+echo 🏢 Front Office Management System Setup
 echo =================================
 
 REM Check if Node.js is installed

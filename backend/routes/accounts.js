@@ -50,6 +50,53 @@ router.post('/', [
     }
 });
 
+// Update account transaction
+router.put('/:id', [
+    body('description').optional().notEmpty(),
+    body('amount').optional().isNumeric(),
+    body('type').optional().isIn(['Income', 'Expense'])
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
+
+        const { data, error } = await supabase
+            .from('accounts')
+            .update(req.body)
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await logAction(`Account transaction updated: ${req.params.id}`, 'admin', supabase);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error updating account transaction:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete account transaction
+router.delete('/:id', async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from('accounts')
+            .delete()
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+
+        await logAction(`Account transaction deleted: ${req.params.id}`, 'admin', supabase);
+        res.json({ success: true, message: 'Transaction deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting account transaction:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Get daily summary
 router.get('/daily-summary', async (req, res) => {
     try {

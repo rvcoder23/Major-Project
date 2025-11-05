@@ -7,7 +7,7 @@ const generatePDF = (data, type = 'report') => {
     const filename = `${type}_${Date.now()}.pdf`;
 
     // PDF content generation logic यहाँ add करें
-    doc.text(`Hotel Management System - ${type.toUpperCase()}`, 50, 50);
+    doc.text(`Front Office Management - ${type.toUpperCase()}`, 50, 50);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 50, 80);
 
     if (type === 'invoice') {

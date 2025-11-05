@@ -1,4 +1,4 @@
-# 🏨 Hotel Management System - Project Summary
+# 🏢 Front Office Management System - Project Summary
 
 ## ✅ Completed Features
 

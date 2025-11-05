@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Hotel Management System Setup Script
-echo "🏨 Hotel Management System Setup"
+# Front Office Management System Setup Script
+echo "🏢 Front Office Management System Setup"
 echo "================================="
 
 # Check if Node.js is installed

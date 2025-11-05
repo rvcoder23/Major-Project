@@ -77,6 +77,8 @@ export const inventoryAPI = {
 export const accountsAPI = {
     getAll: () => api.get('/accounts'),
     create: (data) => api.post('/accounts', data),
+    update: (id, data) => api.put(`/accounts/${id}`, data),
+    delete: (id) => api.delete(`/accounts/${id}`),
     getDailySummary: () => api.get('/accounts/daily-summary'),
     getMonthlySummary: () => api.get('/accounts/monthly-summary'),
     getChartData: (period = '7') => api.get(`/accounts/chart-data?period=${period}`),

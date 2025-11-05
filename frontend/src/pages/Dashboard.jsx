@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Bed,
     Users,
-    DollarSign,
+    IndianRupee,
     Calendar,
     TrendingUp,
     TrendingDown,
@@ -152,7 +152,7 @@ const Dashboard = () => {
         {
             title: "Today's Revenue",
             value: formatCurrency(kpis?.todayRevenue || 0),
-            icon: DollarSign,
+            icon: IndianRupee,
             color: 'bg-purple-500',
             change: '+12.3%',
             changeType: 'positive'
