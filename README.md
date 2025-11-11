@@ -128,4 +128,4 @@ hotel-management/
 - यह एक college project है
 - Internal hotel staff के लिए designed
 - RLS disabled (internal use के लिए)
-- Password management locally handled
+- Password management locally handled.
