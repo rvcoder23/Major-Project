@@ -57,68 +57,12 @@ const Dashboard = () => {
             setTodayCheckins(checkinsRes.data || []);
             setTodayCheckouts(checkoutsRes.data || []);
 
-            // Use dummy data if no real data available
-            if (occupancyRes.data && occupancyRes.data.length > 0) {
-                setOccupancyData(occupancyRes.data);
-            } else {
-                // Generate dummy weekly occupancy data
-                const dummyOccupancy = [];
-                for (let i = 6; i >= 0; i--) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - i);
-                    dummyOccupancy.push({
-                        date: date.toISOString().split('T')[0],
-                        bookings: Math.floor(Math.random() * 8) + 2,
-                        revenue: Math.floor(Math.random() * 15000) + 5000
-                    });
-                }
-                setOccupancyData(dummyOccupancy);
-            }
-
-            if (revenueRes.data && revenueRes.data.length > 0) {
-                setRevenueData(revenueRes.data);
-            } else {
-                // Generate dummy monthly revenue data
-                const dummyRevenue = [];
-                for (let i = 29; i >= 0; i--) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - i);
-                    dummyRevenue.push({
-                        date: date.toISOString().split('T')[0],
-                        revenue: Math.floor(Math.random() * 20000) + 8000
-                    });
-                }
-                setRevenueData(dummyRevenue);
-            }
+            // Use only real data from API (no dummy data)
+            setOccupancyData(occupancyRes.data || []);
+            setRevenueData(revenueRes.data || []);
         } catch (error) {
             toast.error('Failed to fetch dashboard data');
             console.error('Dashboard error:', error);
-
-            // Fallback to dummy data on error
-            const dummyOccupancy = [];
-            const dummyRevenue = [];
-
-            for (let i = 6; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                dummyOccupancy.push({
-                    date: date.toISOString().split('T')[0],
-                    bookings: Math.floor(Math.random() * 8) + 2,
-                    revenue: Math.floor(Math.random() * 15000) + 5000
-                });
-            }
-
-            for (let i = 29; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                dummyRevenue.push({
-                    date: date.toISOString().split('T')[0],
-                    revenue: Math.floor(Math.random() * 20000) + 8000
-                });
-            }
-
-            setOccupancyData(dummyOccupancy);
-            setRevenueData(dummyRevenue);
         } finally {
             setLoading(false);
         }
@@ -129,58 +73,49 @@ const Dashboard = () => {
             title: 'Total Rooms',
             value: kpis?.totalRooms || 0,
             icon: Bed,
-            color: 'bg-blue-500',
-            change: '+2.5%',
-            changeType: 'positive'
+            color: 'bg-blue-500'
         },
         {
             title: 'Available Rooms',
             value: kpis?.availableRooms || 0,
             icon: Eye,
-            color: 'bg-green-500',
-            change: '+5.2%',
-            changeType: 'positive'
+            color: 'bg-green-500'
         },
         {
             title: 'Occupied Rooms',
             value: kpis?.occupiedRooms || 0,
             icon: Users,
-            color: 'bg-orange-500',
-            change: '-1.8%',
-            changeType: 'negative'
+            color: 'bg-orange-500'
         },
         {
             title: "Today's Revenue",
             value: formatCurrency(kpis?.todayRevenue || 0),
             icon: IndianRupee,
-            color: 'bg-purple-500',
-            change: '+12.3%',
-            changeType: 'positive'
+            color: 'bg-purple-500'
         },
         {
             title: 'Pending Cleaning',
             value: kpis?.pendingCleaning || 0,
             icon: Clock,
-            color: 'bg-red-500',
-            change: '-3.1%',
-            changeType: 'positive'
+            color: 'bg-red-500'
         },
         {
             title: "Today's Check-ins",
             value: kpis?.todayCheckins || 0,
             icon: Calendar,
-            color: 'bg-indigo-500',
-            change: '+8.7%',
-            changeType: 'positive'
+            color: 'bg-indigo-500'
         }
     ];
 
     const roomStatusData = [
         { name: 'Available', value: kpis?.availableRooms || 0, color: '#10B981' },
         { name: 'Occupied', value: kpis?.occupiedRooms || 0, color: '#F59E0B' },
-        { name: 'Maintenance', value: 2, color: '#EF4444' },
-        { name: 'Cleaning', value: kpis?.pendingCleaning || 0, color: '#3B82F6' }
+        { name: 'Maintenance', value: kpis?.maintenanceRooms || 0, color: '#EF4444' },
+        { name: 'Cleaning', value: kpis?.cleaningRooms || 0, color: '#3B82F6' }
     ];
+
+    const roomStatusChartData = roomStatusData.filter((item) => item.value > 0);
+    const hasRoomStatusData = roomStatusChartData.length > 0;
 
     if (loading) {
         return (
@@ -222,22 +157,6 @@ const Dashboard = () => {
                                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {card.value}
                                 </p>
-                                <div className="flex items-center mt-2">
-                                    {card.changeType === 'positive' ? (
-                                        <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                                    ) : (
-                                        <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
-                                    )}
-                                    <span
-                                        className={`text-sm ${card.changeType === 'positive'
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
-                                            }`}
-                                    >
-                                        {card.change}
-                                    </span>
-                                    <span className="text-sm text-gray-500 ml-1">vs last week</span>
-                                </div>
                             </div>
                             <div className={`${card.color} p-3 rounded-lg`}>
                                 <card.icon className="h-6 w-6 text-white" />
@@ -254,41 +173,81 @@ const Dashboard = () => {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                         Weekly Occupancy
                     </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={occupancyData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="bookings" fill="#3B82F6" />
-                        </BarChart>
-                    </ResponsiveContainer>
+                    {occupancyData.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500 dark:text-gray-400">
+                            <Calendar className="h-10 w-10 mb-3 text-gray-400" />
+                            <p className="font-medium">No bookings found for the last 7 days</p>
+                            <p className="text-xs mt-1">Create bookings to see occupancy trends here.</p>
+                        </div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={occupancyData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar dataKey="bookings" fill="#3B82F6" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
 
                 {/* Room Status Pie Chart */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                         Room Status Distribution
                     </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                            <Pie
-                                data={roomStatusData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                            >
-                                {roomStatusData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                        </PieChart>
-                    </ResponsiveContainer>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        Live status based on current room records
+                    </p>
+                    <div className="flex flex-col md:flex-row md:items-center">
+                        <div className="flex-1">
+                            {hasRoomStatusData ? (
+                                <ResponsiveContainer width="100%" height={260}>
+                                    <PieChart>
+                                        <Pie
+                                            data={roomStatusChartData}
+                                            cx="50%"
+                                            cy="50%"
+                                            labelLine={false}
+                                            outerRadius={80}
+                                            fill="#8884d8"
+                                            dataKey="value"
+                                        >
+                                            {roomStatusChartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-56 text-center text-gray-500 dark:text-gray-400">
+                                    <Bed className="h-10 w-10 mb-3 text-gray-400" />
+                                    <p className="font-medium">No room status data available</p>
+                                    <p className="text-xs mt-1">Add rooms to see distribution by status.</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-4 md:mt-0 md:ml-6 space-y-2 text-sm">
+                            {roomStatusData.map((item) => (
+                                <div key={item.name} className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <span
+                                            className="inline-block h-3 w-3 rounded-full"
+                                            style={{ backgroundColor: item.color }}
+                                        />
+                                        <span className="text-gray-700 dark:text-gray-300">
+                                            {item.name}
+                                        </span>
+                                    </div>
+                                    <span className="text-gray-900 dark:text-white font-medium">
+                                        {item.value}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -297,21 +256,29 @@ const Dashboard = () => {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Monthly Revenue Trend
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={revenueData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
-                        <Line
-                            type="monotone"
-                            dataKey="revenue"
-                            stroke="#10B981"
-                            strokeWidth={2}
-                            dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                        />
-                    </LineChart>
-                </ResponsiveContainer>
+                {revenueData.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500 dark:text-gray-400">
+                        <IndianRupee className="h-10 w-10 mb-3 text-gray-400" />
+                        <p className="font-medium">No revenue data for this month</p>
+                        <p className="text-xs mt-1">Record income entries to see the trend.</p>
+                    </div>
+                ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={revenueData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip formatter={(value) => formatCurrency(value)} />
+                            <Line
+                                type="monotone"
+                                dataKey="revenue"
+                                stroke="#10B981"
+                                strokeWidth={2}
+                                dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                )}
             </div>
 
             {/* Today's Check-ins and Check-outs */}
@@ -397,30 +364,6 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Quick Actions
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button className="flex items-center justify-center p-4 bg-blue-50 dark:bg-blue-900 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors">
-                        <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2" />
-                        <span className="text-blue-700 dark:text-blue-300 font-medium">New Booking</span>
-                    </button>
-                    <button className="flex items-center justify-center p-4 bg-green-50 dark:bg-green-900 rounded-lg hover:bg-green-100 dark:hover:bg-green-800 transition-colors">
-                        <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400 mr-2" />
-                        <span className="text-green-700 dark:text-green-300 font-medium">Check-in</span>
-                    </button>
-                    <button className="flex items-center justify-center p-4 bg-orange-50 dark:bg-orange-900 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-800 transition-colors">
-                        <Users className="h-6 w-6 text-orange-600 dark:text-orange-400 mr-2" />
-                        <span className="text-orange-700 dark:text-orange-300 font-medium">Housekeeping</span>
-                    </button>
-                    <button className="flex items-center justify-center p-4 bg-purple-50 dark:bg-purple-900 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors">
-                        <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-2" />
-                        <span className="text-purple-700 dark:text-purple-300 font-medium">Reports</span>
-                    </button>
-                </div>
-            </div>
         </div>
     );
 };

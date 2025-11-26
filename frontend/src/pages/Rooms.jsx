@@ -32,7 +32,19 @@ const Rooms = () => {
         room_type: '',
         rate_per_night: '',
         status: 'Available',
-        description: ''
+        description: '',
+        category_of_room: '',
+        bed_type: '',
+        mattresses_and_pillows: '',
+        view_type: '',
+        is_smoking_allowed: false,
+        has_balcony: false,
+        shower_area: false,
+        has_bathtub: false,
+        room_interior_features: '',
+        bathroom_amenities: '',
+        bar_facility: false,
+        bar_charges: ''
     });
 
     useEffect(() => {
@@ -63,7 +75,19 @@ const Rooms = () => {
                 room_type: '',
                 rate_per_night: '',
                 status: 'Available',
-                description: ''
+                description: '',
+                category_of_room: '',
+                bed_type: '',
+                mattresses_and_pillows: '',
+                view_type: '',
+                is_smoking_allowed: false,
+                has_balcony: false,
+                shower_area: false,
+                has_bathtub: false,
+                room_interior_features: '',
+                bathroom_amenities: '',
+                bar_facility: false,
+                bar_charges: ''
             });
             fetchRooms();
         } catch (error) {
@@ -117,7 +141,19 @@ const Rooms = () => {
             room_type: room.room_type,
             rate_per_night: room.rate_per_night,
             status: room.status,
-            description: room.description || ''
+            description: room.description || '',
+            category_of_room: room.category_of_room || '',
+            bed_type: room.bed_type || '',
+            mattresses_and_pillows: room.mattresses_and_pillows || '',
+            view_type: room.view_type || '',
+            is_smoking_allowed: room.is_smoking_allowed || false,
+            has_balcony: room.has_balcony || false,
+            shower_area: room.shower_area || false,
+            has_bathtub: room.has_bathtub || false,
+            room_interior_features: room.room_interior_features || '',
+            bathroom_amenities: (room.bathroom_amenities || []).join(', '),
+            bar_facility: room.bar_facility || false,
+            bar_charges: room.bar_charges || ''
         });
         setShowEditModal(true);
     };
@@ -240,13 +276,53 @@ const Rooms = () => {
                                 </div>
 
                                 <div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Category & Bed</p>
+                                    <p className="text-sm text-gray-900 dark:text-white">
+                                        {room.category_of_room || 'Standard'} • {room.bed_type || 'Not set'}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">View & Smoking</p>
+                                    <p className="text-sm text-gray-900 dark:text-white">
+                                        {(room.view_type || 'Not set')} • {room.is_smoking_allowed ? 'Smoking' : 'Non-smoking'}
+                                    </p>
+                                </div>
+
+                                <div>
                                     <p className="text-sm text-gray-600 dark:text-gray-400">Amenities</p>
-                                    <div className="flex space-x-2 mt-1">
-                                        {getRoomAmenities(room.room_type).map((Icon, index) => (
-                                            <Icon key={index} className="h-4 w-4 text-gray-500" />
-                                        ))}
+                                    <div className="flex flex-wrap gap-2 mt-1 text-xs">
+                                        {room.has_balcony && (
+                                            <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                                                Balcony
+                                            </span>
+                                        )}
+                                        {room.shower_area && (
+                                            <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-200">
+                                                Shower area
+                                            </span>
+                                        )}
+                                        {room.has_bathtub && (
+                                            <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900 dark:text-purple-200">
+                                                Bathtub
+                                            </span>
+                                        )}
+                                        {room.bar_facility && (
+                                            <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900 dark:text-amber-200">
+                                                Bar facility
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
+
+                                {room.bathroom_amenities && room.bathroom_amenities.length > 0 && (
+                                    <div>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">Bathroom Amenities</p>
+                                        <p className="text-sm text-gray-900 dark:text-white">
+                                            {room.bathroom_amenities.join(', ')}
+                                        </p>
+                                    </div>
+                                )}
 
                                 {room.description && (
                                     <div>
@@ -297,11 +373,60 @@ const Rooms = () => {
             {/* Add Room Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                             Add New Room
                         </h3>
-                        <form onSubmit={handleAddRoom} className="space-y-4">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const payload = {
+                                    ...formData,
+                                    is_smoking_allowed: Boolean(formData.is_smoking_allowed),
+                                    has_balcony: Boolean(formData.has_balcony),
+                                    shower_area: Boolean(formData.shower_area),
+                                    has_bathtub: Boolean(formData.has_bathtub),
+                                    bar_facility: Boolean(formData.bar_facility),
+                                    bar_charges: formData.bar_charges ? Number(formData.bar_charges) : null,
+                                    bathroom_amenities: formData.bathroom_amenities
+                                        ? formData.bathroom_amenities
+                                            .split(',')
+                                            .map((a) => a.trim())
+                                            .filter(Boolean)
+                                        : []
+                                };
+                                roomsAPI.create(payload)
+                                    .then(() => {
+                                        toast.success('Room added successfully');
+                                        setShowAddModal(false);
+                                        setFormData({
+                                            room_number: '',
+                                            room_type: '',
+                                            rate_per_night: '',
+                                            status: 'Available',
+                                            description: '',
+                                            category_of_room: '',
+                                            bed_type: '',
+                                            mattresses_and_pillows: '',
+                                            view_type: '',
+                                            is_smoking_allowed: false,
+                                            has_balcony: false,
+                                            shower_area: false,
+                                            has_bathtub: false,
+                                            room_interior_features: '',
+                                            bathroom_amenities: '',
+                                            bar_facility: false,
+                                            bar_charges: ''
+                                        });
+                                        fetchRooms();
+                                    })
+                                    .catch((error) => {
+                                        toast.error('Failed to add room');
+                                        console.error('Add room error:', error);
+                                    });
+                            }}
+                            className="space-y-4"
+                        >
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Room Number
@@ -344,6 +469,200 @@ const Rooms = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Category of Room
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.category_of_room}
+                                    onChange={(e) => setFormData({ ...formData, category_of_room: e.target.value })}
+                                    placeholder="e.g., Standard, Deluxe, Suite"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Bed Type
+                                    </label>
+                                    <select
+                                        value={formData.bed_type}
+                                        onChange={(e) => setFormData({ ...formData, bed_type: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="single">Single</option>
+                                        <option value="double">Double</option>
+                                        <option value="queen">Queen</option>
+                                        <option value="king">King</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        View
+                                    </label>
+                                    <select
+                                        value={formData.view_type}
+                                        onChange={(e) => setFormData({ ...formData, view_type: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="Side View">Side View</option>
+                                        <option value="Sea View">Sea View</option>
+                                        <option value="Garden View">Garden View</option>
+                                        <option value="Mountain View">Mountain View</option>
+                                        <option value="City View">City View</option>
+                                        <option value="Corner View">Corner View</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Mattresses and Pillows
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.mattresses_and_pillows}
+                                    onChange={(e) => setFormData({ ...formData, mattresses_and_pillows: e.target.value })}
+                                    placeholder="e.g., Medium-firm mattress, 2 feather pillows"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="add-smoking"
+                                        type="checkbox"
+                                        checked={formData.is_smoking_allowed}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, is_smoking_allowed: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="add-smoking"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Smoking Room
+                                    </label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="add-balcony"
+                                        type="checkbox"
+                                        checked={formData.has_balcony}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, has_balcony: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="add-balcony"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Balcony
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="add-shower-area"
+                                        type="checkbox"
+                                        checked={formData.shower_area}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, shower_area: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="add-shower-area"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Separate shower area
+                                    </label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="add-bathtub"
+                                        type="checkbox"
+                                        checked={formData.has_bathtub}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, has_bathtub: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="add-bathtub"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Bathtub
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Room Interior Features
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.room_interior_features}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, room_interior_features: e.target.value })
+                                    }
+                                    placeholder="e.g., Wooden flooring, warm lighting"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Bathroom Amenities (comma separated)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.bathroom_amenities}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, bathroom_amenities: e.target.value })
+                                    }
+                                    placeholder="e.g., Shampoo, Conditioner, Bathrobe"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="add-bar-facility"
+                                        type="checkbox"
+                                        checked={formData.bar_facility}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, bar_facility: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="add-bar-facility"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Bar facility in room
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Bar Charges (per night)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={formData.bar_charges}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, bar_charges: e.target.value })
+                                        }
+                                        placeholder="e.g., 500"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Description
                                 </label>
                                 <textarea
@@ -376,11 +695,42 @@ const Rooms = () => {
             {/* Edit Room Modal */}
             {showEditModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                             Edit Room
                         </h3>
-                        <form onSubmit={handleEditRoom} className="space-y-4">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const payload = {
+                                    ...formData,
+                                    is_smoking_allowed: Boolean(formData.is_smoking_allowed),
+                                    has_balcony: Boolean(formData.has_balcony),
+                                    shower_area: Boolean(formData.shower_area),
+                                    has_bathtub: Boolean(formData.has_bathtub),
+                                    bar_facility: Boolean(formData.bar_facility),
+                                    bar_charges: formData.bar_charges ? Number(formData.bar_charges) : null,
+                                    bathroom_amenities: formData.bathroom_amenities
+                                        ? formData.bathroom_amenities
+                                            .split(',')
+                                            .map((a) => a.trim())
+                                            .filter(Boolean)
+                                        : []
+                                };
+                                roomsAPI.update(selectedRoom.id, payload)
+                                    .then(() => {
+                                        toast.success('Room updated successfully');
+                                        setShowEditModal(false);
+                                        setSelectedRoom(null);
+                                        fetchRooms();
+                                    })
+                                    .catch((error) => {
+                                        toast.error('Failed to update room');
+                                        console.error('Update room error:', error);
+                                    });
+                            }}
+                            className="space-y-4"
+                        >
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Room Number
@@ -434,6 +784,197 @@ const Rooms = () => {
                                     <option value="Maintenance">Maintenance</option>
                                     <option value="Cleaning">Cleaning</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Category of Room
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.category_of_room}
+                                    onChange={(e) => setFormData({ ...formData, category_of_room: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Bed Type
+                                    </label>
+                                    <select
+                                        value={formData.bed_type}
+                                        onChange={(e) => setFormData({ ...formData, bed_type: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="single">Single</option>
+                                        <option value="double">Double</option>
+                                        <option value="queen">Queen</option>
+                                        <option value="king">King</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        View
+                                    </label>
+                                    <select
+                                        value={formData.view_type}
+                                        onChange={(e) => setFormData({ ...formData, view_type: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="Side View">Side View</option>
+                                        <option value="Sea View">Sea View</option>
+                                        <option value="Garden View">Garden View</option>
+                                        <option value="Mountain View">Mountain View</option>
+                                        <option value="City View">City View</option>
+                                        <option value="Corner View">Corner View</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Mattresses and Pillows
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.mattresses_and_pillows}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, mattresses_and_pillows: e.target.value })
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="edit-smoking"
+                                        type="checkbox"
+                                        checked={formData.is_smoking_allowed}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, is_smoking_allowed: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="edit-smoking"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Smoking Room
+                                    </label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="edit-balcony"
+                                        type="checkbox"
+                                        checked={formData.has_balcony}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, has_balcony: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="edit-balcony"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Balcony
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="edit-shower-area"
+                                        type="checkbox"
+                                        checked={formData.shower_area}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, shower_area: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="edit-shower-area"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Separate shower area
+                                    </label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="edit-bathtub"
+                                        type="checkbox"
+                                        checked={formData.has_bathtub}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, has_bathtub: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="edit-bathtub"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Bathtub
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Room Interior Features
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.room_interior_features}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, room_interior_features: e.target.value })
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Bathroom Amenities (comma separated)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.bathroom_amenities}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, bathroom_amenities: e.target.value })
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="edit-bar-facility"
+                                        type="checkbox"
+                                        checked={formData.bar_facility}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, bar_facility: e.target.checked })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="edit-bar-facility"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Bar facility in room
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Bar Charges (per night)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={formData.bar_charges}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, bar_charges: e.target.value })
+                                        }
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

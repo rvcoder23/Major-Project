@@ -18,12 +18,6 @@ router.get('/dashboard', async (req, res) => {
             .select('total_amount, payment_status')
             .eq('check_in', today);
 
-        // Get pending cleaning tasks
-        const { data: cleaningData } = await supabase
-            .from('housekeeping')
-            .select('id')
-            .eq('status', 'Pending');
-
         // Get today's revenue
         const { data: revenueData } = await supabase
             .from('accounts')
@@ -31,12 +25,21 @@ router.get('/dashboard', async (req, res) => {
             .eq('type', 'Income')
             .gte('created_at', today);
 
+        const totalRooms = roomsData?.length || 0;
+        const availableRooms = roomsData?.filter(room => room.status === 'Available').length || 0;
+        const occupiedRooms = roomsData?.filter(room => room.status === 'Occupied').length || 0;
+        const maintenanceRooms = roomsData?.filter(room => room.status === 'Maintenance').length || 0;
+        const cleaningRooms = roomsData?.filter(room => room.status === 'Cleaning').length || 0;
+
         const kpis = {
-            totalRooms: roomsData?.length || 0,
-            availableRooms: roomsData?.filter(room => room.status === 'Available').length || 0,
-            occupiedRooms: roomsData?.filter(room => room.status === 'Occupied').length || 0,
+            totalRooms,
+            availableRooms,
+            occupiedRooms,
+            maintenanceRooms,
+            cleaningRooms,
             todayRevenue: revenueData?.reduce((sum, item) => sum + parseFloat(item.amount), 0) || 0,
-            pendingCleaning: cleaningData?.length || 0,
+            // Treat "pending cleaning" as rooms currently in Cleaning status
+            pendingCleaning: cleaningRooms,
             todayCheckins: bookingsData?.length || 0
         };
 

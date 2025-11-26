@@ -14,6 +14,7 @@ const Reports = () => {
     });
     const [dashboardData, setDashboardData] = useState({});
     const [occupancyData, setOccupancyData] = useState([]);
+    const [occupancyPeriod, setOccupancyPeriod] = useState('7'); // 7 days (weekly) or 30 days (monthly)
     const [revenueData, setRevenueData] = useState([]);
     const [comprehensiveData, setComprehensiveData] = useState({});
 
@@ -26,7 +27,7 @@ const Reports = () => {
             setLoading(true);
             const [dashboardRes, occupancyRes, revenueRes] = await Promise.all([
                 reportsAPI.getDashboard(),
-                reportsAPI.getOccupancy('7'),
+                reportsAPI.getOccupancy(occupancyPeriod),
                 reportsAPI.getRevenue()
             ]);
             
@@ -315,7 +316,31 @@ const Reports = () => {
             {/* Occupancy Report */}
             {activeReport === 'occupancy' && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Occupancy Trends</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Occupancy Trends</h3>
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Period:</span>
+                            <select
+                                value={occupancyPeriod}
+                                onChange={async (e) => {
+                                    const value = e.target.value;
+                                    setOccupancyPeriod(value);
+                                    try {
+                                        const res = await reportsAPI.getOccupancy(value);
+                                        if (res.success) {
+                                            setOccupancyData(res.data);
+                                        }
+                                    } catch (err) {
+                                        console.error('Error fetching occupancy data:', err);
+                                    }
+                                }}
+                                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="7">Last 7 days (Weekly)</option>
+                                <option value="30">Last 30 days (Monthly)</option>
+                            </select>
+                        </div>
+                    </div>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={occupancyData}>

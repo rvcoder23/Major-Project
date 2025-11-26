@@ -5,6 +5,17 @@ const { logAction } = require('../utils/logger');
 
 const router = express.Router();
 
+// Helper to calculate GST rate based on room price per night
+const getGstRateForRoomPrice = (ratePerNight) => {
+    if (ratePerNight == null) return 0;
+    const price = Number(ratePerNight) || 0;
+
+    if (price <= 5499) return 0.12;        // 12%
+    if (price <= 7499) return 0.18;        // 18%
+    if (price <= 8499) return 0.28;        // 28%
+    return 0.28;                           // 8500 and above → 28%
+};
+
 // Get all bookings
 router.get('/', async (req, res) => {
     try {
@@ -56,12 +67,16 @@ router.get('/:id', async (req, res) => {
 
 // Create new booking
 router.post('/', [
-    body('guest_name').notEmpty().withMessage('Guest name is required'),
+    body('first_name').notEmpty().withMessage('First name is required'),
+    body('last_name').notEmpty().withMessage('Last name is required'),
     body('phone_number').matches(/^[0-9]{10}$/).withMessage('Phone number must be exactly 10 digits'),
     body('aadhar_number').matches(/^[0-9]{12}$/).withMessage('Valid 12-digit Aadhar number is required'),
     body('room_id').isInt().withMessage('Room ID must be a number'),
     body('check_in').isISO8601().withMessage('Check-in date is required'),
-    body('check_out').isISO8601().withMessage('Check-out date is required')
+    body('check_out').isISO8601().withMessage('Check-out date is required'),
+    body('registration_card_printout').optional().isBoolean(),
+    body('vip_category').optional().isIn(['VIP', 'CIP', 'VVIP']),
+    body('booking_notes').optional().isString()
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -121,13 +136,24 @@ router.post('/', [
         const checkIn = new Date(checkInStr);
         const checkOut = new Date(checkOutStr);
         const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-        const totalAmount = nights * roomData.rate_per_night;
+        const baseAmount = nights * roomData.rate_per_night;
+
+        // GST calculation based on room price per night
+        const gstRateDecimal = getGstRateForRoomPrice(roomData.rate_per_night); // 0.12, 0.18, 0.28 etc.
+        const gstAmount = baseAmount * gstRateDecimal;
+        const totalAmount = baseAmount + gstAmount;
 
         const bookingData = {
             ...req.body,
+            guest_name: `${req.body.first_name} ${req.body.last_name}`.trim(),
             check_in: checkInStr,
             check_out: checkOutStr,
-            total_amount: totalAmount
+            total_amount: totalAmount,
+            gst_rate: gstRateDecimal * 100, // store as percentage (e.g. 12, 18, 28)
+            gst_amount: gstAmount,
+            registration_card_printout: req.body.registration_card_printout ?? false,
+            vip_category: req.body.vip_category || null,
+            booking_notes: req.body.booking_notes || null
         };
 
         const { data, error } = await supabase

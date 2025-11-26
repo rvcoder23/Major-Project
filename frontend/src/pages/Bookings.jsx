@@ -14,13 +14,17 @@ const Bookings = () => {
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
     const [newBooking, setNewBooking] = useState({
-        guest_name: '',
+        first_name: '',
+        last_name: '',
         phone_number: '',
         aadhar_number: '',
         room_id: '',
         check_in: '',
         check_out: '',
-        payment_status: 'Pending'
+        payment_status: 'Pending',
+        registration_card_printout: false,
+        vip_category: '',
+        booking_notes: ''
     });
 
     useEffect(() => {
@@ -83,17 +87,29 @@ const Bookings = () => {
         }
 
         try {
-            const response = await bookingsAPI.create(newBooking);
+            // Map UI state to API payload
+            const payload = {
+                ...newBooking,
+                registration_card_printout: Boolean(newBooking.registration_card_printout) || false,
+                vip_category: newBooking.vip_category || undefined,
+                booking_notes: newBooking.booking_notes || undefined
+            };
+
+            const response = await bookingsAPI.create(payload);
             if (response.success) {
                 setShowNewBookingModal(false);
                 setNewBooking({
-                    guest_name: '',
+                    first_name: '',
+                    last_name: '',
                     phone_number: '',
                     aadhar_number: '',
                     room_id: '',
                     check_in: '',
                     check_out: '',
-                    payment_status: 'Pending'
+                    payment_status: 'Pending',
+                    registration_card_printout: false,
+                    vip_category: '',
+                    booking_notes: ''
                 });
                 fetchBookings();
                 // Refresh rooms so the booked room disappears if it became occupied
@@ -136,7 +152,7 @@ const Bookings = () => {
         const roomNumber = booking.rooms?.room_number?.toString?.() || '';
         const phone = booking.phone_number || '';
         const term = searchTerm.toLowerCase();
-        const matchesSearch = booking.guest_name.toLowerCase().includes(term) ||
+            const matchesSearch = booking.guest_name.toLowerCase().includes(term) ||
             roomNumber.toLowerCase().includes(term) ||
             phone.toLowerCase().includes(term);
         const matchesStatus = !statusFilter || booking.booking_status === statusFilter;
@@ -402,17 +418,31 @@ const Bookings = () => {
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">New Booking</h2>
                         <form onSubmit={handleCreateBooking}>
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Guest Name
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={newBooking.guest_name}
-                                        onChange={(e) => setNewBooking({ ...newBooking, guest_name: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                    />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            First Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newBooking.first_name}
+                                            onChange={(e) => setNewBooking({ ...newBooking, first_name: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Last Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newBooking.last_name}
+                                            onChange={(e) => setNewBooking({ ...newBooking, last_name: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -518,6 +548,53 @@ const Bookings = () => {
                                         <option value="Failed">Failed</option>
                                     </select>
                                 </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        id="registrationCardPrintout"
+                                        type="checkbox"
+                                        checked={newBooking.registration_card_printout}
+                                        onChange={(e) =>
+                                            setNewBooking({
+                                                ...newBooking,
+                                                registration_card_printout: e.target.checked
+                                            })
+                                        }
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <label
+                                        htmlFor="registrationCardPrintout"
+                                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        Registration card printout required
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        VIP Category
+                                    </label>
+                                    <select
+                                        value={newBooking.vip_category}
+                                        onChange={(e) => setNewBooking({ ...newBooking, vip_category: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="">None</option>
+                                        <option value="VIP">VIP</option>
+                                        <option value="CIP">CIP</option>
+                                        <option value="VVIP">VVIP</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Booking Notes / Special Requests
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        value={newBooking.booking_notes}
+                                        onChange={(e) => setNewBooking({ ...newBooking, booking_notes: e.target.value })}
+                                        placeholder="e.g., May arrive late, room preferences, special requests"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
                             </div>
                             <div className="flex justify-end space-x-3 mt-6">
                                 <button
@@ -579,7 +656,15 @@ const Bookings = () => {
                                     </p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Amount</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">GST</label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {selectedBooking.gst_rate
+                                            ? `${selectedBooking.gst_rate}% (₹${selectedBooking.gst_amount || 0})`
+                                            : 'N/A'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Amount (Incl. GST)</label>
                                     <p className="text-gray-900 dark:text-white">₹{selectedBooking.total_amount}</p>
                                 </div>
                                 <div>
@@ -594,6 +679,24 @@ const Bookings = () => {
                                         {selectedBooking.payment_status}
                                     </span>
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">VIP Category</label>
+                                    <p className="text-gray-900 dark:text-white">{selectedBooking.vip_category || 'None'}</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Registration Card Printout</label>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {selectedBooking.registration_card_printout ? 'Yes' : 'No'}
+                                    </p>
+                                </div>
+                                {selectedBooking.booking_notes && (
+                                    <div className="col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Booking Notes</label>
+                                        <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                                            {selectedBooking.booking_notes}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="flex justify-end mt-6">
