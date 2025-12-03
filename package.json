@@ -1,0 +1,25 @@
+{
+    "name": "front-office-management",
+    "version": "1.0.0",
+    "description": "Complete Front Office Management System using MERN + Supabase",
+    "main": "server.js",
+    "scripts": {
+        "dev": "concurrently \"npm run server\" \"npm run client\"",
+        "server": "cd backend && npx nodemon server.js",
+        "client": "cd frontend && npm run dev",
+        "build": "cd frontend && npm run build",
+        "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    },
+    "keywords": [
+        "hotel",
+        "management",
+        "mern",
+        "supabase",
+        "college-project"
+    ],
+    "author": "College Student",
+    "license": "MIT",
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
