@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, Eye, Clock, User, Bed, IndianRupee, Calendar as CalendarIcon, Grid, List, Phone } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Calendar, Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, Eye, Clock, User, Bed, IndianRupee, Calendar as CalendarIcon, Grid, List, Phone, Receipt } from 'lucide-react';
 import { bookingsAPI, roomsAPI, billsAPI } from '../services/api';
 import BookingCalendar from '../components/BookingCalendar';
 import Invoice from '../components/Invoice';
 
 const Bookings = () => {
-    const [bookings, setBookings] = useState([]);
-    const [rooms, setRooms] = useState([]);
-    const [paymentMethods, setPaymentMethods] = useState(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+
+    // State variables
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [showNewBookingModal, setShowNewBookingModal] = useState(false);
@@ -40,51 +40,101 @@ const Bookings = () => {
         nights: 0
     });
 
-    useEffect(() => {
-        fetchBookings();
-        fetchRooms();
-        fetchPaymentMethods();
-    }, []);
+    const { data: bookings = [], isLoading: loadingBookings, isError: isBookingsError, error: bookingsError } = useQuery({
+        queryKey: ['bookings'],
+        queryFn: async () => {
+            const response = await bookingsAPI.getAll();
+            return response.data;
+        }
+    });
 
+    const { data: rooms = [] } = useQuery({
+        queryKey: ['rooms'],
+        queryFn: async () => {
+            const response = await roomsAPI.getAll();
+            return response.data;
+        }
+    });
+
+    const { data: paymentMethods = ['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer'] } = useQuery({
+        queryKey: ['paymentMethods'],
+        queryFn: async () => {
+            const response = await bookingsAPI.getPaymentMethods();
+            return Array.isArray(response.data) ? response.data : ['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer'];
+        },
+        initialData: ['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']
+    });
+
+    // Calculate booking amount when relevant fields change
     useEffect(() => {
         calculateBookingAmount();
-    }, [newBooking.room_id, newBooking.check_in, newBooking.check_out]);
+    }, [newBooking.room_id, newBooking.check_in, newBooking.check_out, rooms]);
 
-    const fetchBookings = async () => {
-        try {
-            setLoading(true);
-            const response = await bookingsAPI.getAll();
-            if (response.success) {
-                setBookings(response.data);
-            }
-        } catch (error) {
-            console.error('Error fetching bookings:', error);
-        } finally {
-            setLoading(false);
+    const createBookingMutation = useMutation({
+        mutationFn: (newBookingData) => bookingsAPI.create(newBookingData),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['bookings']);
+            queryClient.invalidateQueries(['rooms']); // Rooms status might change
+            queryClient.invalidateQueries(['dashboard']); // Dashboard stats change
+            setShowNewBookingModal(false);
+            setNewBooking({
+                first_name: '',
+                last_name: '',
+                phone_number: '',
+                aadhar_number: '',
+                room_id: '',
+                check_in: '',
+                check_out: '',
+                payment_status: 'Pending',
+                payment_method: 'Cash',
+                registration_card_printout: false,
+                vip_category: '',
+                booking_notes: ''
+            });
+            setBookingCalculation({
+                baseAmount: 0,
+                gstRate: 0,
+                gstAmount: 0,
+                totalAmount: 0,
+                nights: 0
+            });
+            alert('Booking created successfully');
+        },
+        onError: (error) => {
+            alert(error?.response?.data?.error || 'Error creating booking');
+            console.error('Error creating booking:', error);
         }
-    };
+    });
 
-    const fetchRooms = async () => {
-        try {
-            const response = await roomsAPI.getAll();
-            if (response.success) {
-                setRooms(response.data);
-            }
-        } catch (error) {
-            console.error('Error fetching rooms:', error);
+    const cancelBookingMutation = useMutation({
+        mutationFn: (id) => bookingsAPI.cancel(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['bookings']);
+            queryClient.invalidateQueries(['rooms']);
+            queryClient.invalidateQueries(['dashboard']);
+            alert('Booking cancelled successfully');
+        },
+        onError: (error) => {
+            console.error('Error cancelling booking:', error);
+            alert('Failed to cancel booking');
         }
-    };
+    });
 
-    const fetchPaymentMethods = async () => {
-        try {
-            const response = await bookingsAPI.getPaymentMethods();
-            if (response.success && Array.isArray(response.data)) {
-                setPaymentMethods(response.data);
-            }
-        } catch (error) {
-            console.error('Error fetching payment methods:', error);
+    const checkoutBookingMutation = useMutation({
+        mutationFn: (id) => bookingsAPI.checkout(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['bookings']);
+            queryClient.invalidateQueries(['rooms']);
+            queryClient.invalidateQueries(['dashboard']);
+            alert('Booking checked out successfully');
+        },
+        onError: (error) => {
+            console.error('Error checking out booking:', error);
+            alert('Failed to check out booking');
         }
-    };
+    });
+
+    const loading = loadingBookings;
 
     const calculateGstRate = (baseAmount) => {
         const amount = Number(baseAmount) || 0;
@@ -112,7 +162,7 @@ const Bookings = () => {
         const checkIn = new Date(newBooking.check_in);
         const checkOut = new Date(newBooking.check_out);
         const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-        
+
         if (nights <= 0) return;
 
         const baseAmount = nights * selectedRoom.rate_per_night;
@@ -129,7 +179,7 @@ const Bookings = () => {
         });
     };
 
-    const handleCreateBooking = async (e) => {
+    const handleCreateBooking = (e) => {
         e.preventDefault();
 
         // Date validation
@@ -158,73 +208,26 @@ const Bookings = () => {
             return;
         }
 
-        try {
-            // Map UI state to API payload
-            const payload = {
-                ...newBooking,
-                registration_card_printout: Boolean(newBooking.registration_card_printout) || false,
-                vip_category: newBooking.vip_category || undefined,
-                booking_notes: newBooking.booking_notes || undefined
-            };
+        // Map UI state to API payload
+        const payload = {
+            ...newBooking,
+            registration_card_printout: Boolean(newBooking.registration_card_printout) || false,
+            vip_category: newBooking.vip_category || undefined,
+            booking_notes: newBooking.booking_notes || undefined
+        };
 
-            const response = await bookingsAPI.create(payload);
-            if (response.success) {
-                setShowNewBookingModal(false);
-                setNewBooking({
-                    first_name: '',
-                    last_name: '',
-                    phone_number: '',
-                    aadhar_number: '',
-                    room_id: '',
-                    check_in: '',
-                    check_out: '',
-                    payment_status: 'Pending',
-                    payment_method: 'Cash',
-                    registration_card_printout: false,
-                    vip_category: '',
-                    booking_notes: ''
-                });
-                setBookingCalculation({
-                    baseAmount: 0,
-                    gstRate: 0,
-                    gstAmount: 0,
-                    totalAmount: 0,
-                    nights: 0
-                });
-                fetchBookings();
-                // Refresh rooms so the booked room disappears if it became occupied
-                fetchRooms();
-            }
-        } catch (error) {
-            // Show pop-up error from backend (e.g., overlap or validation)
-            alert(error?.response?.data?.error || 'Error creating booking');
-            console.error('Error creating booking:', error);
-        }
+        createBookingMutation.mutate(payload);
     };
 
-    const handleCancelBooking = async (id) => {
+    const handleCancelBooking = (id) => {
         if (window.confirm('Are you sure you want to cancel this booking?')) {
-            try {
-                const response = await bookingsAPI.cancel(id);
-                if (response.success) {
-                    fetchBookings();
-                }
-            } catch (error) {
-                console.error('Error cancelling booking:', error);
-            }
+            cancelBookingMutation.mutate(id);
         }
     };
 
-    const handleCheckout = async (id) => {
+    const handleCheckout = (id) => {
         if (window.confirm('Are you sure you want to checkout this booking?')) {
-            try {
-                const response = await bookingsAPI.checkout(id);
-                if (response.success) {
-                    fetchBookings();
-                }
-            } catch (error) {
-                console.error('Error checking out booking:', error);
-            }
+            checkoutBookingMutation.mutate(id);
         }
     };
 
@@ -232,7 +235,7 @@ const Bookings = () => {
         const roomNumber = booking.rooms?.room_number?.toString?.() || '';
         const phone = booking.phone_number || '';
         const term = searchTerm.toLowerCase();
-            const matchesSearch = booking.guest_name.toLowerCase().includes(term) ||
+        const matchesSearch = booking.guest_name.toLowerCase().includes(term) ||
             roomNumber.toLowerCase().includes(term) ||
             phone.toLowerCase().includes(term);
         const matchesStatus = !statusFilter || booking.booking_status === statusFilter;
@@ -250,14 +253,14 @@ const Bookings = () => {
 
     const handleGenerateBill = async () => {
         if (!selectedBooking) return;
-        
+
         try {
             setGeneratingBill(true);
             const response = await billsAPI.generateForBooking(selectedBooking.id, {
                 payment_method: selectedBooking.payment_method || 'Cash',
                 payment_status: selectedBooking.payment_status || 'Pending'
             });
-            
+
             if (response.success) {
                 setCurrentBill(response.data);
                 setShowEditModal(false);
@@ -388,6 +391,10 @@ const Bookings = () => {
                         <div className="text-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                             <p className="mt-4 text-gray-600 dark:text-gray-400">Loading bookings...</p>
+                        </div>
+                    ) : isBookingsError ? (
+                        <div className="text-center py-12 text-red-600">
+                            <p>Error loading bookings: {bookingsError.message}</p>
                         </div>
                     ) : filteredBookings.length === 0 ? (
                         <div className="text-center py-12">

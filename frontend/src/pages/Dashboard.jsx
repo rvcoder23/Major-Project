@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
     Bed,
     Users,
@@ -31,20 +32,9 @@ import { formatCurrency } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
-    const [kpis, setKpis] = useState(null);
-    const [occupancyData, setOccupancyData] = useState([]);
-    const [revenueData, setRevenueData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [todayCheckins, setTodayCheckins] = useState([]);
-    const [todayCheckouts, setTodayCheckouts] = useState([]);
-
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
-
-    const fetchDashboardData = async () => {
-        try {
-            setLoading(true);
+    const { data: dashboardData, isLoading: loading, isError, error } = useQuery({
+        queryKey: ['dashboard'],
+        queryFn: async () => {
             const [kpisRes, occupancyRes, revenueRes, checkinsRes, checkoutsRes] = await Promise.all([
                 reportsAPI.getDashboard(),
                 reportsAPI.getOccupancy('7'),
@@ -53,20 +43,21 @@ const Dashboard = () => {
                 bookingsAPI.getTodayCheckouts()
             ]);
 
-            setKpis(kpisRes.data);
-            setTodayCheckins(checkinsRes.data || []);
-            setTodayCheckouts(checkoutsRes.data || []);
-
-            // Use only real data from API (no dummy data)
-            setOccupancyData(occupancyRes.data || []);
-            setRevenueData(revenueRes.data || []);
-        } catch (error) {
-            toast.error('Failed to fetch dashboard data');
-            console.error('Dashboard error:', error);
-        } finally {
-            setLoading(false);
+            return {
+                kpis: kpisRes.data,
+                occupancy: occupancyRes.data || [],
+                revenue: revenueRes.data || [],
+                checkins: checkinsRes.data || [],
+                checkouts: checkoutsRes.data || []
+            };
         }
-    };
+    });
+
+    const kpis = dashboardData?.kpis;
+    const occupancyData = dashboardData?.occupancy || [];
+    const revenueData = dashboardData?.revenue || [];
+    const todayCheckins = dashboardData?.checkins || [];
+    const todayCheckouts = dashboardData?.checkouts || [];
 
     const kpiCards = [
         {
@@ -121,6 +112,14 @@ const Dashboard = () => {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
+
+    if (isError) {
+        return (
+            <div className="flex items-center justify-center h-64 text-red-600">
+                <p>Error loading dashboard: {error.message}</p>
             </div>
         );
     }

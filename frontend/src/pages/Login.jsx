@@ -20,7 +20,7 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            const success = login(formData.username, formData.password);
+            const success = await login(formData.username, formData.password);
 
             if (success) {
                 toast.success('Login successful!');

@@ -139,8 +139,8 @@ router.post('/orders', [
     body('item_id').isInt().withMessage('Item ID must be a number'),
     body('quantity').isInt().withMessage('Quantity must be a number'),
     body('customer_name').notEmpty().withMessage('Customer name is required'),
-    body('table_number').optional().isInt().withMessage('Table number must be a number'),
-    body('room_number').optional().isInt().withMessage('Room number must be a number'),
+    body('table_number').optional({ nullable: true }).isInt().withMessage('Table number must be a number'),
+    body('room_number').optional({ nullable: true }).isInt().withMessage('Room number must be a number'),
     body('order_type').optional().isIn(['Restaurant', 'Room Service']).withMessage('Order type must be Restaurant or Room Service'),
     body('plate_type').optional().isIn(['Half', 'Full']).withMessage('Plate type must be Half or Full'),
     body('payment_method').optional().isIn(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer'])
@@ -162,7 +162,7 @@ router.post('/orders', [
 
         // Calculate price - use full_plate_price if available, else price
         let unitPrice = menuItem.full_plate_price || menuItem.price;
-        
+
         // If half plate is requested, use 60% of the price
         if (req.body.plate_type === 'Half') {
             unitPrice = menuItem.half_plate_price || Math.round(unitPrice * 0.6);
@@ -185,6 +185,29 @@ router.post('/orders', [
 
         // Generate order number
         const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        // Validate room number if order type is Room Service
+        if (req.body.order_type === 'Room Service' && req.body.room_number) {
+            const { data: room, error: roomError } = await supabase
+                .from('rooms')
+                .select('id, room_number, status')
+                .eq('room_number', req.body.room_number)
+                .single();
+
+            if (roomError || !room) {
+                return res.status(400).json({
+                    success: false,
+                    errors: [{ msg: `Room ${req.body.room_number} does not exist.` }]
+                });
+            }
+
+            if (room.status !== 'Occupied') {
+                return res.status(400).json({
+                    success: false,
+                    errors: [{ msg: `Room ${req.body.room_number} is not currently occupied.` }]
+                });
+            }
+        }
 
         const orderData = {
             order_number: orderNumber,
@@ -303,12 +326,12 @@ router.get('/revenue/today', async (req, res) => {
         const totalRevenue = data.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
         const orderCount = data.length;
 
-        res.json({ 
-            success: true, 
-            data: { 
+        res.json({
+            success: true,
+            data: {
                 total_revenue: totalRevenue,
                 order_count: orderCount
-            } 
+            }
         });
     } catch (error) {
         console.error('Error fetching today\'s revenue:', error);

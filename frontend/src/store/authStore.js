@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import axios from 'axios';
+
+// Create axios instance with base URL
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+});
 
 const useAuthStore = create(
     persist(
@@ -7,31 +13,44 @@ const useAuthStore = create(
             isAuthenticated: false,
             user: null,
 
-            login: (username, password) => {
-                // Local authentication - no database check
-                if (username === 'admin' && password === 'admin123') {
-                    set({
-                        isAuthenticated: true,
-                        user: { username: 'admin', role: 'admin' }
-                    });
-                    return true;
+            login: async (username, password) => {
+                try {
+                    const response = await api.post('/auth/login', { username, password });
+
+                    if (response.data.success) {
+                        set({
+                            isAuthenticated: true,
+                            user: response.data.user
+                        });
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('Login failed:', error);
+                    return false;
                 }
-                return false;
             },
 
             logout: () => {
                 set({ isAuthenticated: false, user: null });
             },
 
-            changePassword: (newPassword) => {
-                // Password change logic - stored in localStorage
-                const currentUser = get().user;
-                if (currentUser) {
-                    // In a real app, you'd hash this password
-                    localStorage.setItem('admin_password', newPassword);
-                    return true;
+            changePassword: async (currentPassword, newPassword) => {
+                try {
+                    const currentUser = get().user;
+                    if (!currentUser) return false;
+
+                    const response = await api.post('/auth/change-password', {
+                        username: currentUser.username,
+                        currentPassword,
+                        newPassword
+                    });
+
+                    return response.data.success;
+                } catch (error) {
+                    console.error('Change password failed:', error);
+                    return false;
                 }
-                return false;
             }
         }),
         {

@@ -16,6 +16,8 @@ const foodRoutes = require('./routes/food');
 const accountsRoutes = require('./routes/accounts');
 const reportsRoutes = require('./routes/reports');
 const billsRoutes = require('./routes/bills');
+const authRoutes = require('./routes/auth');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,7 +25,14 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' ? 'your-production-url' : 'http://localhost:3000',
+    origin: process.env.NODE_ENV === 'production' ? 'your-production-url' : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:5173', // Vite default
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:5173'
+    ],
     credentials: true
 }));
 app.use(morgan('combined'));
@@ -46,6 +55,8 @@ app.use('/api/food', foodRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/bills', billsRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

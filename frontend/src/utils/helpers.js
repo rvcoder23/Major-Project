@@ -6,10 +6,9 @@ export function cn(...inputs) {
 }
 
 export function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-    }).format(amount);
+    // Use simple formatting to avoid Indian locale numbering issues
+    const formatted = Number(amount).toFixed(2);
+    return `Rs. ${formatted}`;
 }
 
 export function formatDate(date) {

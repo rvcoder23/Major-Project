@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, User, Hotel, Bell, Palette, Save } from 'lucide-react';
+import { Lock, User, Hotel, Bell, Palette, Save, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import { settingsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Settings = () => {
@@ -11,6 +12,9 @@ const Settings = () => {
         newPassword: '',
         confirmPassword: ''
     });
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [hotelInfo, setHotelInfo] = useState({
         name: 'Grand Hotel',
         address: '123 Main Street, City, State',
@@ -18,10 +22,54 @@ const Settings = () => {
         email: 'info@grandhotel.com'
     });
 
+    // Notification Settings State
+    const [notificationSettings, setNotificationSettings] = useState({
+        email_notifications: true,
+        low_stock_alerts: true,
+        booking_notifications: true
+    });
+
     const { changePassword } = useAuthStore();
     const { isDarkMode, toggleTheme } = useThemeStore();
 
-    const handlePasswordChange = (e) => {
+    // Fetch settings on load
+    React.useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const res = await settingsAPI.getNotifications();
+                if (res.success) {
+                    setNotificationSettings(res.data);
+                }
+            } catch (error) {
+                console.error('Error fetching settings:', error);
+                // Don't toast on load error to avoid annoyance if API fails silently
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    const handleNotificationChange = (key, value) => {
+        setNotificationSettings(prev => ({
+            ...prev,
+            [key]: value
+        }));
+    };
+
+    const saveNotificationSettings = async () => {
+        try {
+            const res = await settingsAPI.updateNotifications(notificationSettings);
+            if (res.success) {
+                toast.success('Notification preferences saved');
+            } else {
+                toast.error('Failed to save preferences');
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            toast.error('Error saving preferences');
+        }
+    };
+
+    const handlePasswordChange = async (e) => {
         e.preventDefault();
 
         if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -34,7 +82,7 @@ const Settings = () => {
             return;
         }
 
-        const success = changePassword(passwordForm.newPassword);
+        const success = await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
         if (success) {
             toast.success('Password changed successfully');
             setPasswordForm({
@@ -136,37 +184,76 @@ const Settings = () => {
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                             Current Password
                                         </label>
-                                        <input
-                                            type="password"
-                                            required
-                                            value={passwordForm.currentPassword}
-                                            onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type={showCurrentPassword ? 'text' : 'password'}
+                                                required
+                                                value={passwordForm.currentPassword}
+                                                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                            >
+                                                {showCurrentPassword ? (
+                                                    <EyeOff className="h-5 w-5 text-gray-400" />
+                                                ) : (
+                                                    <Eye className="h-5 w-5 text-gray-400" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                             New Password
                                         </label>
-                                        <input
-                                            type="password"
-                                            required
-                                            value={passwordForm.newPassword}
-                                            onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type={showNewPassword ? 'text' : 'password'}
+                                                required
+                                                value={passwordForm.newPassword}
+                                                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                            >
+                                                {showNewPassword ? (
+                                                    <EyeOff className="h-5 w-5 text-gray-400" />
+                                                ) : (
+                                                    <Eye className="h-5 w-5 text-gray-400" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                             Confirm New Password
                                         </label>
-                                        <input
-                                            type="password"
-                                            required
-                                            value={passwordForm.confirmPassword}
-                                            onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type={showConfirmPassword ? 'text' : 'password'}
+                                                required
+                                                value={passwordForm.confirmPassword}
+                                                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-10"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            >
+                                                {showConfirmPassword ? (
+                                                    <EyeOff className="h-5 w-5 text-gray-400" />
+                                                ) : (
+                                                    <Eye className="h-5 w-5 text-gray-400" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                     <button
                                         type="submit"
@@ -255,7 +342,12 @@ const Settings = () => {
                                                 Receive email notifications for important updates
                                             </p>
                                         </div>
-                                        <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600" />
+                                        <input
+                                            type="checkbox"
+                                            checked={notificationSettings.email_notifications}
+                                            onChange={(e) => handleNotificationChange('email_notifications', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        />
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -266,7 +358,12 @@ const Settings = () => {
                                                 Get notified when inventory items are running low
                                             </p>
                                         </div>
-                                        <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600" />
+                                        <input
+                                            type="checkbox"
+                                            checked={notificationSettings.low_stock_alerts}
+                                            onChange={(e) => handleNotificationChange('low_stock_alerts', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        />
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -277,7 +374,20 @@ const Settings = () => {
                                                 Receive notifications for new bookings and cancellations
                                             </p>
                                         </div>
-                                        <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600" />
+                                        <input
+                                            type="checkbox"
+                                            checked={notificationSettings.booking_notifications}
+                                            onChange={(e) => handleNotificationChange('booking_notifications', e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div className="pt-4">
+                                        <button
+                                            onClick={saveNotificationSettings}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            Save Preferences
+                                        </button>
                                     </div>
                                 </div>
                             </div>

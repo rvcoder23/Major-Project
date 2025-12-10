@@ -10,7 +10,7 @@ const Invoice = ({ bill, onClose }) => {
     const downloadPDF = () => {
         const doc = new jsPDF('p', 'mm', 'a4');
         const pageWidth = doc.internal.pageSize.getWidth();
-        
+
         // Colors
         const primaryColor = [37, 99, 235]; // Blue-600
         const darkGray = [55, 65, 81]; // Gray-700
@@ -19,12 +19,12 @@ const Invoice = ({ bill, onClose }) => {
         // Header
         doc.setFillColor(...primaryColor);
         doc.rect(0, 0, pageWidth, 40, 'F');
-        
+
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(24);
         doc.setFont('helvetica', 'bold');
         doc.text(bill.hotel_name || 'Front Office Management Hotel', pageWidth / 2, 20, { align: 'center' });
-        
+
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text('TAX INVOICE', pageWidth / 2, 30, { align: 'center' });
@@ -45,7 +45,7 @@ const Invoice = ({ bill, onClose }) => {
         doc.setFont('helvetica', 'bold');
         doc.text('Bill To:', 20, yPos);
         yPos += 7;
-        
+
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(bill.guest_name, 20, yPos);
@@ -70,11 +70,11 @@ const Invoice = ({ bill, onClose }) => {
             tableData.push([
                 item.item_description,
                 item.quantity.toString(),
-                `₹${item.unit_price.toFixed(2)}`,
-                `₹${item.base_amount.toFixed(2)}`,
+                `Rs. ${item.unit_price.toFixed(2)}`,
+                `Rs. ${item.base_amount.toFixed(2)}`,
                 `${item.gst_rate.toFixed(2)}%`,
-                `₹${item.gst_amount.toFixed(2)}`,
-                `₹${item.total_amount.toFixed(2)}`
+                `Rs. ${item.gst_amount.toFixed(2)}`,
+                `Rs. ${item.total_amount.toFixed(2)}`
             ]);
         });
 
@@ -105,21 +105,21 @@ const Invoice = ({ bill, onClose }) => {
         yPos = doc.lastAutoTable.finalY + 10;
 
         // Totals
-        const totalsY = yPos;
+        let totalsY = yPos;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        
+
         doc.text('Subtotal:', pageWidth - 70, totalsY);
-        doc.text(`₹${bill.subtotal.toFixed(2)}`, pageWidth - 20, totalsY, { align: 'right' });
+        doc.text(`Rs. ${bill.subtotal.toFixed(2)}`, pageWidth - 20, totalsY, { align: 'right' });
         totalsY += 7;
-        
+
         doc.text(`GST (${bill.gst_rate.toFixed(2)}%):`, pageWidth - 70, totalsY);
-        doc.text(`₹${bill.gst_amount.toFixed(2)}`, pageWidth - 20, totalsY, { align: 'right' });
+        doc.text(`Rs. ${bill.gst_amount.toFixed(2)}`, pageWidth - 20, totalsY, { align: 'right' });
         totalsY += 7;
-        
+
         if (bill.discount > 0) {
             doc.text('Discount:', pageWidth - 70, totalsY);
-            doc.text(`-₹${bill.discount.toFixed(2)}`, pageWidth - 20, totalsY, { align: 'right' });
+            doc.text(`-Rs. ${bill.discount.toFixed(2)}`, pageWidth - 20, totalsY, { align: 'right' });
             totalsY += 7;
         }
 
@@ -127,9 +127,9 @@ const Invoice = ({ bill, onClose }) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
         doc.setFillColor(...lightGray);
-        doc.rect(pageWidth - 70, totalsY - 5, 50, 8, 'F');
-        doc.text('Total Amount:', pageWidth - 70, totalsY + 3);
-        doc.text(`₹${bill.total_amount.toFixed(2)}`, pageWidth - 20, totalsY + 3, { align: 'right' });
+        doc.rect(pageWidth - 90, totalsY - 5, 70, 8, 'F');
+        doc.text('Total Amount:', pageWidth - 88, totalsY + 3);
+        doc.text(`Rs. ${bill.total_amount.toFixed(2)}`, pageWidth - 20, totalsY + 3, { align: 'right' });
         totalsY += 15;
 
         // Payment Information
@@ -137,7 +137,7 @@ const Invoice = ({ bill, onClose }) => {
         doc.setFontSize(10);
         doc.text('Payment Information:', 20, totalsY);
         totalsY += 7;
-        
+
         doc.setFont('helvetica', 'normal');
         doc.text(`Payment Method: ${bill.payment_method || 'Cash'}`, 20, totalsY);
         totalsY += 5;
@@ -249,19 +249,19 @@ const Invoice = ({ bill, onClose }) => {
                                             {item.quantity}
                                         </td>
                                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            ₹{item.unit_price.toFixed(2)}
+                                            Rs. {item.unit_price.toFixed(2)}
                                         </td>
                                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            ₹{item.base_amount.toFixed(2)}
+                                            Rs. {item.base_amount.toFixed(2)}
                                         </td>
                                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
                                             {item.gst_rate.toFixed(2)}%
                                         </td>
                                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            ₹{item.gst_amount.toFixed(2)}
+                                            Rs. {item.gst_amount.toFixed(2)}
                                         </td>
                                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
-                                            ₹{item.total_amount.toFixed(2)}
+                                            Rs. {item.total_amount.toFixed(2)}
                                         </td>
                                     </tr>
                                 ))}
@@ -275,22 +275,22 @@ const Invoice = ({ bill, onClose }) => {
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                                    <span className="text-gray-900 dark:text-white font-medium">₹{bill.subtotal.toFixed(2)}</span>
+                                    <span className="text-gray-900 dark:text-white font-medium">Rs. {bill.subtotal.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600 dark:text-gray-400">GST ({bill.gst_rate.toFixed(2)}%):</span>
-                                    <span className="text-gray-900 dark:text-white font-medium">₹{bill.gst_amount.toFixed(2)}</span>
+                                    <span className="text-gray-900 dark:text-white font-medium">Rs. {bill.gst_amount.toFixed(2)}</span>
                                 </div>
                                 {bill.discount > 0 && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600 dark:text-gray-400">Discount:</span>
-                                        <span className="text-red-600 dark:text-red-400 font-medium">-₹{bill.discount.toFixed(2)}</span>
+                                        <span className="text-red-600 dark:text-red-400 font-medium">-Rs. {bill.discount.toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className="border-t-2 border-gray-300 dark:border-gray-600 pt-2 mt-2">
                                     <div className="flex justify-between">
                                         <span className="text-lg font-bold text-gray-900 dark:text-white">Total Amount:</span>
-                                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">₹{bill.total_amount.toFixed(2)}</span>
+                                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">Rs. {bill.total_amount.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -307,11 +307,10 @@ const Invoice = ({ bill, onClose }) => {
                             </div>
                             <div>
                                 <span className="text-gray-600 dark:text-gray-400">Payment Status: </span>
-                                <span className={`font-medium ${
-                                    bill.payment_status === 'Paid' ? 'text-green-600 dark:text-green-400' : 
-                                    bill.payment_status === 'Pending' ? 'text-yellow-600 dark:text-yellow-400' : 
-                                    'text-red-600 dark:text-red-400'
-                                }`}>
+                                <span className={`font-medium ${bill.payment_status === 'Paid' ? 'text-green-600 dark:text-green-400' :
+                                    bill.payment_status === 'Pending' ? 'text-yellow-600 dark:text-yellow-400' :
+                                        'text-red-600 dark:text-red-400'
+                                    }`}>
                                     {bill.payment_status || 'Pending'}
                                 </span>
                             </div>

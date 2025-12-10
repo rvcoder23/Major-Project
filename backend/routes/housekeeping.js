@@ -38,8 +38,8 @@ router.get('/', async (req, res) => {
 
         // Sort by priority and date
         query = query.order('priority', { ascending: false })
-                     .order('cleaning_date', { ascending: true })
-                     .order('due_time', { ascending: true, nullsFirst: false });
+            .order('cleaning_date', { ascending: true })
+            .order('due_time', { ascending: true, nullsFirst: false });
 
         const { data, error } = await query;
 
@@ -48,13 +48,13 @@ router.get('/', async (req, res) => {
         // Fetch staff information for tasks that have assigned staff
         const staffIds = [...new Set(data.filter(t => t.assigned_staff_id).map(t => t.assigned_staff_id))];
         let staffMap = {};
-        
+
         if (staffIds.length > 0) {
             const { data: staffData } = await supabase
                 .from('housekeeping_staff')
                 .select('id, staff_name, employee_id, designation, specialization')
                 .in('id', staffIds);
-            
+
             if (staffData) {
                 staffMap = staffData.reduce((acc, staff) => {
                     acc[staff.id] = staff;
@@ -101,7 +101,7 @@ router.get('/:id', async (req, res) => {
                 .select('id, staff_name, employee_id, phone_number, designation, specialization')
                 .eq('id', data.assigned_staff_id)
                 .single();
-            
+
             data.staff = staffData || null;
         } else {
             data.staff = null;
@@ -179,7 +179,7 @@ router.post('/', [
                 .select('staff_name, employee_id, designation')
                 .eq('id', data.assigned_staff_id)
                 .single();
-            
+
             data.staff = staffData || null;
         } else {
             data.staff = null;
@@ -224,7 +224,7 @@ router.patch('/:id/status', [
                 .select('started_at')
                 .eq('id', req.params.id)
                 .single();
-            
+
             if (task?.started_at) {
                 const startTime = new Date(task.started_at);
                 const endTime = new Date();
@@ -255,7 +255,7 @@ router.patch('/:id/status', [
                 .select('staff_name, employee_id, designation')
                 .eq('id', data.assigned_staff_id)
                 .single();
-            
+
             data.staff = staffData || null;
         } else {
             data.staff = null;
@@ -325,7 +325,7 @@ router.put('/:id', async (req, res) => {
                 .select('staff_name, employee_id, designation')
                 .eq('id', data.assigned_staff_id)
                 .single();
-            
+
             data.staff = staffData || null;
         } else {
             data.staff = null;
@@ -341,7 +341,7 @@ router.put('/:id', async (req, res) => {
 
 // Update checklist
 router.patch('/:id/checklist', [
-    body('checklist').isObject().withMessage('Checklist must be an object')
+    body('checklist').isArray().withMessage('Checklist must be an array')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -417,7 +417,7 @@ router.patch('/:id/inspect', [
                 .select('staff_name, employee_id, designation')
                 .eq('id', data.assigned_staff_id)
                 .single();
-            
+
             data.staff = staffData || null;
         } else {
             data.staff = null;
@@ -467,13 +467,13 @@ router.get('/pending', async (req, res) => {
         // Fetch staff information
         const staffIds = [...new Set(data.filter(t => t.assigned_staff_id).map(t => t.assigned_staff_id))];
         let staffMap = {};
-        
+
         if (staffIds.length > 0) {
             const { data: staffData } = await supabase
                 .from('housekeeping_staff')
                 .select('id, staff_name, employee_id, designation')
                 .in('id', staffIds);
-            
+
             if (staffData) {
                 staffMap = staffData.reduce((acc, staff) => {
                     acc[staff.id] = staff;
@@ -519,13 +519,13 @@ router.get('/overdue', async (req, res) => {
         // Fetch staff information
         const staffIds = [...new Set(data.filter(t => t.assigned_staff_id).map(t => t.assigned_staff_id))];
         let staffMap = {};
-        
+
         if (staffIds.length > 0) {
             const { data: staffData } = await supabase
                 .from('housekeeping_staff')
                 .select('id, staff_name, employee_id, designation')
                 .in('id', staffIds);
-            
+
             if (staffData) {
                 staffMap = staffData.reduce((acc, staff) => {
                     acc[staff.id] = staff;
@@ -568,13 +568,13 @@ router.get('/today/report', async (req, res) => {
         // Fetch staff information
         const staffIds = [...new Set(data.filter(t => t.assigned_staff_id).map(t => t.assigned_staff_id))];
         let staffMap = {};
-        
+
         if (staffIds.length > 0) {
             const { data: staffData } = await supabase
                 .from('housekeeping_staff')
                 .select('id, staff_name, employee_id, designation')
                 .in('id', staffIds);
-            
+
             if (staffData) {
                 staffMap = staffData.reduce((acc, staff) => {
                     acc[staff.id] = staff;

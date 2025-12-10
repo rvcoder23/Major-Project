@@ -125,4 +125,10 @@ export const billsAPI = {
     updatePayment: (id, data) => api.patch(`/bills/${id}/payment`, data),
 };
 
+// Settings API
+export const settingsAPI = {
+    getNotifications: () => api.get('/settings/notifications'),
+    updateNotifications: (data) => api.put('/settings/notifications', data),
+};
+
 export default api;

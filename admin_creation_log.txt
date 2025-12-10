@@ -1,0 +1,29 @@
+﻿========================================
+Creating Admin User
+========================================
+
+Step 1: Generating password hash...
+Γ£à Hash generated: $2a$10$MEBrJ7eBUPyhM4JbIyBWVuyoyX3amiqem.TNdf6SyJr0i4PgDs2ou
+
+Step 2: Removing existing admin user...
+Γ£à Existing user removed
+
+Step 3: Creating new admin user...
+Γ£à Admin user created successfully!
+User details: [
+  {
+    id: 5,
+    username: 'admin',
+    password_hash: '$2a$10$MEBrJ7eBUPyhM4JbIyBWVuyoyX3amiqem.TNdf6SyJr0i4PgDs2ou',
+    created_at: '2025-12-07T14:53:03.768459'
+  }
+]
+
+========================================
+SUCCESS!
+========================================
+Login credentials:
+  Username: admin
+  Password: admin123
+
+You can now login to your application!

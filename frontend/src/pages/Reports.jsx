@@ -30,7 +30,7 @@ const Reports = () => {
                 reportsAPI.getOccupancy(occupancyPeriod),
                 reportsAPI.getRevenue()
             ]);
-            
+
             if (dashboardRes.success) setDashboardData(dashboardRes.data);
             if (occupancyRes.success) setOccupancyData(occupancyRes.data);
             if (revenueRes.success) setRevenueData(revenueRes.data);
@@ -45,9 +45,15 @@ const Reports = () => {
         try {
             setLoading(true);
             const res = await reportsAPI.getComprehensive(dateRange.startDate, dateRange.endDate);
-            if (res.success) setComprehensiveData(res.data);
+            if (res.success) {
+                setComprehensiveData(res.data);
+                // Switch to comprehensive tab to show the data
+                setActiveReport('comprehensive');
+                alert('Report generated successfully!');
+            }
         } catch (err) {
             console.error('Error fetching comprehensive report:', err);
+            alert('Error generating report. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -55,18 +61,18 @@ const Reports = () => {
 
     const exportToPDF = () => {
         const doc = new jsPDF();
-        
+
         // Header
         doc.setFontSize(20);
         doc.text('Front Office Management - Report', 20, 20);
         doc.setFontSize(12);
         doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
         doc.text(`Date Range: ${dateRange.startDate} to ${dateRange.endDate}`, 20, 35);
-        
+
         // Dashboard KPIs
         doc.setFontSize(16);
         doc.text('Dashboard KPIs', 20, 50);
-        
+
         const kpiData = [
             ['Metric', 'Value'],
             ['Total Rooms', dashboardData.totalRooms || 0],
@@ -76,19 +82,19 @@ const Reports = () => {
             ['Pending Cleaning', dashboardData.pendingCleaning || 0],
             ['Today Check-ins', dashboardData.todayCheckins || 0]
         ];
-        
+
         doc.autoTable({
             head: [kpiData[0]],
             body: kpiData.slice(1),
             startY: 60,
             styles: { fontSize: 10 }
         });
-        
+
         // Comprehensive Report Data
         if (Object.keys(comprehensiveData).length > 0) {
             doc.setFontSize(16);
             doc.text('Comprehensive Report', 20, doc.lastAutoTable.finalY + 20);
-            
+
             const reportData = [
                 ['Category', 'Metric', 'Value'],
                 ['Bookings', 'Total', comprehensiveData.bookings?.total || 0],
@@ -102,7 +108,7 @@ const Reports = () => {
                 ['Housekeeping', 'Completed', comprehensiveData.housekeeping?.completed || 0],
                 ['Housekeeping', 'Pending', comprehensiveData.housekeeping?.pending || 0]
             ];
-            
+
             doc.autoTable({
                 head: [reportData[0]],
                 body: reportData.slice(1),
@@ -110,42 +116,63 @@ const Reports = () => {
                 styles: { fontSize: 10 }
             });
         }
-        
+
         doc.save(`hotel-report-${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     const exportToExcel = () => {
-        // Create CSV content
-        let csvContent = "Front Office Management Report\n";
-        csvContent += `Generated on: ${new Date().toLocaleDateString()}\n`;
-        csvContent += `Date Range: ${dateRange.startDate} to ${dateRange.endDate}\n\n`;
-        
-        csvContent += "Dashboard KPIs\n";
-        csvContent += "Metric,Value\n";
-        csvContent += `Total Rooms,${dashboardData.totalRooms || 0}\n`;
-        csvContent += `Available Rooms,${dashboardData.availableRooms || 0}\n`;
-        csvContent += `Occupied Rooms,${dashboardData.occupiedRooms || 0}\n`;
-        csvContent += `Today Revenue,₹${dashboardData.todayRevenue || 0}\n`;
-        csvContent += `Pending Cleaning,${dashboardData.pendingCleaning || 0}\n`;
-        csvContent += `Today Check-ins,${dashboardData.todayCheckins || 0}\n\n`;
-        
+        // Helper function to escape and quote CSV values
+        const formatCell = (value) => {
+            const stringValue = String(value);
+            // If value contains comma, newline, or quotes, wrap in quotes and escape quotes
+            if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+            }
+            return stringValue;
+        };
+
+        // Create CSV with proper formatting
+        let rows = [];
+
+        // Header
+        rows.push([formatCell('Front Office Management Report')]);
+        rows.push([formatCell(`Generated on: ${new Date().toLocaleDateString()}`)]);
+        rows.push([formatCell(`Date Range: ${dateRange.startDate} to ${dateRange.endDate}`)]);
+        rows.push([]); // Empty row
+
+        // Dashboard KPIs
+        rows.push([formatCell('Dashboard KPIs')]);
+        rows.push([formatCell('Metric'), formatCell('Value')]);
+        rows.push([formatCell('Total Rooms'), formatCell(dashboardData.totalRooms || 0)]);
+        rows.push([formatCell('Available Rooms'), formatCell(dashboardData.availableRooms || 0)]);
+        rows.push([formatCell('Occupied Rooms'), formatCell(dashboardData.occupiedRooms || 0)]);
+        rows.push([formatCell('Today Revenue'), formatCell(`Rs. ${dashboardData.todayRevenue || 0}`)]);
+        rows.push([formatCell('Pending Cleaning'), formatCell(dashboardData.pendingCleaning || 0)]);
+        rows.push([formatCell('Today Check-ins'), formatCell(dashboardData.todayCheckins || 0)]);
+        rows.push([]); // Empty row
+
+        // Comprehensive Report
         if (Object.keys(comprehensiveData).length > 0) {
-            csvContent += "Comprehensive Report\n";
-            csvContent += "Category,Metric,Value\n";
-            csvContent += `Bookings,Total,${comprehensiveData.bookings?.total || 0}\n`;
-            csvContent += `Bookings,Revenue,₹${comprehensiveData.bookings?.totalRevenue || 0}\n`;
-            csvContent += `Bookings,Completed,${comprehensiveData.bookings?.completed || 0}\n`;
-            csvContent += `Bookings,Cancelled,${comprehensiveData.bookings?.cancelled || 0}\n`;
-            csvContent += `Accounts,Total Income,₹${comprehensiveData.accounts?.totalIncome || 0}\n`;
-            csvContent += `Accounts,Total Expense,₹${comprehensiveData.accounts?.totalExpense || 0}\n`;
-            csvContent += `Accounts,Net Profit,₹${comprehensiveData.accounts?.netProfit || 0}\n`;
-            csvContent += `Housekeeping,Total Tasks,${comprehensiveData.housekeeping?.totalTasks || 0}\n`;
-            csvContent += `Housekeeping,Completed,${comprehensiveData.housekeeping?.completed || 0}\n`;
-            csvContent += `Housekeeping,Pending,${comprehensiveData.housekeeping?.pending || 0}\n`;
+            rows.push([formatCell('Comprehensive Report')]);
+            rows.push([formatCell('Category'), formatCell('Metric'), formatCell('Value')]);
+            rows.push([formatCell('Bookings'), formatCell('Total'), formatCell(comprehensiveData.bookings?.total || 0)]);
+            rows.push([formatCell('Bookings'), formatCell('Revenue'), formatCell(`Rs. ${comprehensiveData.bookings?.totalRevenue || 0}`)]);
+            rows.push([formatCell('Bookings'), formatCell('Completed'), formatCell(comprehensiveData.bookings?.completed || 0)]);
+            rows.push([formatCell('Bookings'), formatCell('Cancelled'), formatCell(comprehensiveData.bookings?.cancelled || 0)]);
+            rows.push([formatCell('Accounts'), formatCell('Total Income'), formatCell(`Rs. ${comprehensiveData.accounts?.totalIncome || 0}`)]);
+            rows.push([formatCell('Accounts'), formatCell('Total Expense'), formatCell(`Rs. ${comprehensiveData.accounts?.totalExpense || 0}`)]);
+            rows.push([formatCell('Accounts'), formatCell('Net Profit'), formatCell(`Rs. ${comprehensiveData.accounts?.netProfit || 0}`)]);
+            rows.push([formatCell('Housekeeping'), formatCell('Total Tasks'), formatCell(comprehensiveData.housekeeping?.totalTasks || 0)]);
+            rows.push([formatCell('Housekeeping'), formatCell('Completed'), formatCell(comprehensiveData.housekeeping?.completed || 0)]);
+            rows.push([formatCell('Housekeeping'), formatCell('Pending'), formatCell(comprehensiveData.housekeeping?.pending || 0)]);
         }
-        
-        // Download CSV
-        const blob = new Blob([csvContent], { type: 'text/csv' });
+
+        // Convert rows to CSV string
+        const csvContent = rows.map(row => row.join(',')).join('\n');
+
+        // Add BOM for proper Excel Unicode support
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -175,14 +202,14 @@ const Reports = () => {
                     </p>
                 </div>
                 <div className="flex space-x-3">
-                    <button 
+                    <button
                         onClick={exportToPDF}
                         className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                     >
                         <Download className="h-5 w-5 mr-2" />
                         Export PDF
                     </button>
-                    <button 
+                    <button
                         onClick={exportToExcel}
                         className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                     >
@@ -200,11 +227,10 @@ const Reports = () => {
                         <button
                             key={report.id}
                             onClick={() => setActiveReport(report.id)}
-                            className={`p-6 rounded-lg border-2 transition-all ${
-                                activeReport === report.id
-                                    ? `border-${report.color}-500 bg-${report.color}-50 dark:bg-${report.color}-900/20`
-                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300'
-                            }`}
+                            className={`p-6 rounded-lg border-2 transition-all ${activeReport === report.id
+                                ? `border-${report.color}-500 bg-${report.color}-50 dark:bg-${report.color}-900/20`
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300'
+                                }`}
                         >
                             <div className="flex items-center">
                                 <IconComponent className={`h-8 w-8 text-${report.color}-500 mr-3`} />
