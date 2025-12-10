@@ -28,6 +28,7 @@ const Reports = () => {
             const [dashboardRes, occupancyRes, revenueRes] = await Promise.all([
                 reportsAPI.getDashboard(),
                 reportsAPI.getOccupancy(occupancyPeriod),
+                // Initial fetch uses default (current month)
                 reportsAPI.getRevenue()
             ]);
 
@@ -40,6 +41,23 @@ const Reports = () => {
             setLoading(false);
         }
     };
+
+    // Refetch revenue when date range changes if active report is revenue
+    useEffect(() => {
+        if (activeReport === 'revenue') {
+            const fetchRevenue = async () => {
+                try {
+                    const res = await reportsAPI.getRevenue(dateRange.startDate, dateRange.endDate);
+                    if (res.success) {
+                        setRevenueData(res.data);
+                    }
+                } catch (err) {
+                    console.error('Error fetching revenue:', err);
+                }
+            };
+            fetchRevenue();
+        }
+    }, [activeReport, dateRange]);
 
     const fetchComprehensiveReport = async () => {
         try {
@@ -106,8 +124,21 @@ const Reports = () => {
                 ['Accounts', 'Net Profit', `₹${comprehensiveData.accounts?.netProfit || 0}`],
                 ['Housekeeping', 'Total Tasks', comprehensiveData.housekeeping?.totalTasks || 0],
                 ['Housekeeping', 'Completed', comprehensiveData.housekeeping?.completed || 0],
-                ['Housekeeping', 'Pending', comprehensiveData.housekeeping?.pending || 0]
+                ['Housekeeping', 'Pending', comprehensiveData.housekeeping?.pending || 0],
+                ['Food Court', 'Total Orders', comprehensiveData.foodCourt?.totalOrders || 0],
+                ['Food Court', 'Total Revenue', `₹${comprehensiveData.foodCourt?.totalRevenue || 0}`],
+                ['Food Court', 'Served', comprehensiveData.foodCourt?.served || 0],
+                ['Food Court', 'Cancelled', comprehensiveData.foodCourt?.cancelled || 0],
+                ['Inventory', 'Total Items', comprehensiveData.inventory?.totalItems || 0],
+                ['Inventory', 'Total Valuation', `₹${comprehensiveData.inventory?.totalValuation || 0}`],
+                ['Inventory', 'Low Stock Items', comprehensiveData.inventory?.lowStockItems || 0],
+                ['Inventory', 'Purchase Cost', `₹${comprehensiveData.inventory?.purchaseCost || 0}`],
+                ['Rooms', 'Rooms Added', comprehensiveData.rooms?.added || 0]
             ];
+
+            if (comprehensiveData.rooms?.added > 0) {
+                reportData.push(['Rooms', 'New Rooms List', comprehensiveData.rooms?.newRooms.join(', ')]);
+            }
 
             doc.autoTable({
                 head: [reportData[0]],
@@ -165,6 +196,21 @@ const Reports = () => {
             rows.push([formatCell('Housekeeping'), formatCell('Total Tasks'), formatCell(comprehensiveData.housekeeping?.totalTasks || 0)]);
             rows.push([formatCell('Housekeeping'), formatCell('Completed'), formatCell(comprehensiveData.housekeeping?.completed || 0)]);
             rows.push([formatCell('Housekeeping'), formatCell('Pending'), formatCell(comprehensiveData.housekeeping?.pending || 0)]);
+
+            rows.push([formatCell('Food Court'), formatCell('Total Orders'), formatCell(comprehensiveData.foodCourt?.totalOrders || 0)]);
+            rows.push([formatCell('Food Court'), formatCell('Total Revenue'), formatCell(`Rs. ${comprehensiveData.foodCourt?.totalRevenue || 0}`)]);
+            rows.push([formatCell('Food Court'), formatCell('Served'), formatCell(comprehensiveData.foodCourt?.served || 0)]);
+            rows.push([formatCell('Food Court'), formatCell('Cancelled'), formatCell(comprehensiveData.foodCourt?.cancelled || 0)]);
+
+            rows.push([formatCell('Inventory'), formatCell('Total Items'), formatCell(comprehensiveData.inventory?.totalItems || 0)]);
+            rows.push([formatCell('Inventory'), formatCell('Total Valuation'), formatCell(`Rs. ${comprehensiveData.inventory?.totalValuation || 0}`)]);
+            rows.push([formatCell('Inventory'), formatCell('Low Stock Items'), formatCell(comprehensiveData.inventory?.lowStockItems || 0)]);
+            rows.push([formatCell('Inventory'), formatCell('Purchase Cost'), formatCell(`Rs. ${comprehensiveData.inventory?.purchaseCost || 0}`)]);
+
+            rows.push([formatCell('Rooms'), formatCell('Rooms Added'), formatCell(comprehensiveData.rooms?.added || 0)]);
+            if (comprehensiveData.rooms?.added > 0) {
+                rows.push([formatCell('Rooms'), formatCell('New Rooms List'), formatCell(comprehensiveData.rooms?.newRooms.join(', '))]);
+            }
         }
 
         // Convert rows to CSV string
@@ -385,17 +431,25 @@ const Reports = () => {
             {activeReport === 'revenue' && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Revenue Trends</h3>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={revenueData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <Tooltip />
-                                <Line type="monotone" dataKey="revenue" stroke="#82ca9d" strokeWidth={2} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {revenueData.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500 dark:text-gray-400">
+                            <IndianRupee className="h-10 w-10 mb-3 text-gray-400" />
+                            <p className="font-medium">No revenue data for this period</p>
+                            <p className="text-xs mt-1">Try adjusting the date range.</p>
+                        </div>
+                    ) : (
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={revenueData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis />
+                                    <Tooltip formatter={(value) => `₹${value}`} />
+                                    <Line type="monotone" dataKey="revenue" stroke="#82ca9d" strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -462,6 +516,70 @@ const Reports = () => {
                                             <span className="text-gray-600 dark:text-gray-400">Pending:</span>
                                             <span className="font-semibold text-yellow-600">{comprehensiveData.housekeeping?.pending || 0}</span>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Food Court Summary</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Total Orders:</span>
+                                            <span className="font-semibold">{comprehensiveData.foodCourt?.totalOrders || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Total Revenue:</span>
+                                            <span className="font-semibold text-green-600">₹{comprehensiveData.foodCourt?.totalRevenue || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Served:</span>
+                                            <span className="font-semibold text-blue-600">{comprehensiveData.foodCourt?.served || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Cancelled:</span>
+                                            <span className="font-semibold text-red-600">{comprehensiveData.foodCourt?.cancelled || 0}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Inventory Summary</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Total Items:</span>
+                                            <span className="font-semibold">{comprehensiveData.inventory?.totalItems || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Total Valuation:</span>
+                                            <span className="font-semibold">₹{comprehensiveData.inventory?.totalValuation || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Low Stock Items:</span>
+                                            <span className="font-semibold text-red-600">{comprehensiveData.inventory?.lowStockItems || 0}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Period Purchase Cost:</span>
+                                            <span className="font-semibold text-orange-600">₹{comprehensiveData.inventory?.purchaseCost || 0}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Room Updates</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400">Rooms Added:</span>
+                                            <span className="font-semibold">{comprehensiveData.rooms?.added || 0}</span>
+                                        </div>
+                                        {comprehensiveData.rooms?.added > 0 && (
+                                            <div className="text-sm text-gray-500 mt-2">
+                                                New Rooms: {comprehensiveData.rooms?.newRooms.join(', ')}
+                                            </div>
+                                        )}
+                                        {comprehensiveData.rooms?.added === 0 && (
+                                            <div className="text-sm text-gray-500 mt-2 italic">
+                                                No new rooms added in this period.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

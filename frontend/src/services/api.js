@@ -105,13 +105,23 @@ export const foodAPI = {
     getTodayOrders: () => api.get('/food/orders/today'),
     getTodayRevenue: () => api.get('/food/revenue/today'),
     getCategories: () => api.get('/food/categories'),
+    createBatchOrder: (data) => api.post('/food/orders/batch', data),
+    getOrderDetails: (orderNumber) => api.get(`/food/orders/number/${orderNumber}`),
+    addItemToOrder: (orderNumber, items) => api.post(`/food/orders/${orderNumber}/add`, { items }),
+    deleteOrderItem: (id) => api.delete(`/food/orders/item/${id}`),
 };
 
 // Reports API
 export const reportsAPI = {
     getDashboard: () => api.get('/reports/dashboard'),
     getOccupancy: (period = '7') => api.get(`/reports/occupancy?period=${period}`),
-    getRevenue: () => api.get('/reports/revenue'),
+    getRevenue: (startDate, endDate) => {
+        let qs = '';
+        if (startDate && endDate) {
+            qs = `?startDate=${startDate}&endDate=${endDate}`;
+        }
+        return api.get(`/reports/revenue${qs}`);
+    },
     getComprehensive: (startDate, endDate) =>
         api.get(`/reports/comprehensive?startDate=${startDate}&endDate=${endDate}`),
 };
@@ -122,6 +132,7 @@ export const billsAPI = {
     getById: (id) => api.get(`/bills/${id}`),
     getByInvoiceNumber: (invoiceNumber) => api.get(`/bills/invoice/${invoiceNumber}`),
     generateForBooking: (bookingId, data) => api.post(`/bills/generate/${bookingId}`, data),
+    generateForFoodOrder: (orderId, data) => api.post(`/bills/generate/food/${orderId}`, data),
     updatePayment: (id, data) => api.patch(`/bills/${id}/payment`, data),
 };
 

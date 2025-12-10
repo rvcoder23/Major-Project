@@ -310,6 +310,237 @@ router.get('/orders/today', async (req, res) => {
     }
 });
 
+// Get order by order number (for editing)
+router.get('/orders/number/:orderNumber', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('food_orders')
+            .select(`
+                *,
+                food_menu (
+                    item_name,
+                    category,
+                    price
+                )
+            `)
+            .eq('order_number', req.params.orderNumber);
+
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error fetching order details:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create batch order (Multiple items)
+router.post('/orders/batch', [
+    body('items').isArray({ min: 1 }).withMessage('Items must be an array with at least one item'),
+    body('customer_name').notEmpty().withMessage('Customer name is required'),
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
+
+        const { items, customer_name, table_number, room_number, order_type, payment_method } = req.body;
+
+        const orderRows = [];
+        const failedItems = [];
+
+        // Generate one order number for the batch
+        const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const orderDate = new Date().toISOString();
+
+        // Validate Room if needed
+        if (order_type === 'Room Service' && room_number) {
+            const { data: room, error: roomError } = await supabase
+                .from('rooms')
+                .select('id, status')
+                .eq('room_number', room_number)
+                .single();
+
+            if (roomError || !room) return res.status(400).json({ success: false, error: 'Room not found' });
+            if (room.status !== 'Occupied') return res.status(400).json({ success: false, error: 'Room is not occupied' });
+        }
+
+        // Process each item
+        for (const item of items) {
+            // Get price from DB to be safe
+            // Removed full_plate_price/half_plate_price as they don't exist in DB yet
+            const { data: menuItem, error: itemError } = await supabase
+                .from('food_menu')
+                .select('id, price')
+                .eq('id', item.item_id)
+                .single();
+
+            if (itemError || !menuItem) {
+                console.error(`Menu item lookup failed for ID ${item.item_id}:`, itemError);
+                failedItems.push(`ID ${item.item_id}: ${itemError?.message || 'Not found'}`);
+                continue;
+            }
+
+            // Fallback logic: Use price as full plate, calculate 60% for half
+            let unitPrice = menuItem.price || 0;
+            if (item.plate_type === 'Half') {
+                unitPrice = Math.round(unitPrice * 0.6);
+            }
+
+            const baseAmount = unitPrice * item.quantity;
+
+            // GST Calculation (Fixed 5% for Restaurant)
+            const gstRate = 0.05;
+            const gstAmount = Math.round(baseAmount * gstRate * 100) / 100;
+            const totalAmount = Math.round((baseAmount + gstAmount) * 100) / 100;
+
+            orderRows.push({
+                order_number: orderNumber,
+                order_date: orderDate,
+                item_id: menuItem.id,
+                quantity: item.quantity,
+                base_amount: baseAmount,
+                gst_rate: gstRate * 100,
+                gst_amount: gstAmount,
+                total_amount: totalAmount,
+                customer_name,
+                table_number: table_number || null,
+                room_number: room_number || null,
+                order_type: order_type || 'Restaurant',
+                plate_type: item.plate_type || 'Full',
+                payment_method: payment_method || 'Cash',
+                status: 'Pending'
+            });
+        }
+
+        if (orderRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Order failed. Could not find items: ${failedItems.join(', ')}`
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('food_orders')
+            .insert(orderRows)
+            .select();
+
+        if (error) throw error;
+
+        await logAction(`Batch order created: ${orderNumber} (${items.length} items)`, 'admin', supabase);
+        res.json({ success: true, data, order_number: orderNumber });
+
+    } catch (error) {
+        console.error('Error creating batch order:', error);
+        res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+    }
+});
+
+// Add items to existing order
+router.post('/orders/:orderNumber/add', async (req, res) => {
+    try {
+        const { orderNumber } = req.params;
+        const { items } = req.body; // Array of new items
+
+        // Fetch existing order details for Customer/Table info
+        const { data: existingOrderData } = await supabase
+            .from('food_orders')
+            .select('customer_name, table_number, room_number, order_type, payment_method')
+            .eq('order_number', orderNumber)
+            .limit(1);
+
+        if (!existingOrderData || existingOrderData.length === 0) return res.status(404).json({ success: false, error: 'Order not found' });
+        const existingOrder = existingOrderData[0];
+
+        const orderRows = [];
+        const failedItems = [];
+        const orderDate = new Date().toISOString();
+
+        for (const item of items) {
+            const { data: menuItem, error: itemError } = await supabase
+                .from('food_menu')
+                .select('id, price')
+                .eq('id', item.item_id)
+                .single();
+
+            if (itemError || !menuItem) {
+                console.error(`Add item lookup failed for ID ${item.item_id}:`, itemError);
+                failedItems.push(`ID ${item.item_id}: ${itemError?.message || 'Not found'}`);
+                continue;
+            }
+
+            let unitPrice = menuItem.price || 0;
+            if (item.plate_type === 'Half') {
+                unitPrice = Math.round(unitPrice * 0.6);
+            }
+
+            const baseAmount = unitPrice * item.quantity;
+
+            // GST Calculation (Fixed 5% for Restaurant)
+            const gstRate = 0.05;
+            const gstAmount = Math.round(baseAmount * gstRate * 100) / 100;
+            const totalAmount = Math.round((baseAmount + gstAmount) * 100) / 100;
+
+            orderRows.push({
+                order_number: orderNumber,
+                order_date: orderDate,
+                item_id: menuItem.id,
+                quantity: item.quantity,
+                base_amount: baseAmount,
+                gst_rate: gstRate * 100,
+                gst_amount: gstAmount,
+                total_amount: totalAmount,
+                customer_name: existingOrder.customer_name,
+                table_number: existingOrder.table_number,
+                room_number: existingOrder.room_number,
+                order_type: existingOrder.order_type,
+                plate_type: item.plate_type || 'Full',
+                payment_method: existingOrder.payment_method,
+                status: 'Pending'
+            });
+        }
+
+        if (orderRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Add failed. Could not find items: ${failedItems.join(', ')}`
+            });
+        }
+
+        const { data, error } = await supabase
+            .from('food_orders')
+            .insert(orderRows)
+            .select();
+
+        if (error) throw error;
+
+        await logAction(`Added items to order: ${orderNumber}`, 'admin', supabase);
+        res.json({ success: true, data });
+
+    } catch (error) {
+        console.error('Error adding to order:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete specific order item
+router.delete('/orders/item/:id', async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from('food_orders')
+            .delete()
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+
+        await logAction(`Deleted order item: ${req.params.id}`, 'admin', supabase);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting order item:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Get today's revenue
 router.get('/revenue/today', async (req, res) => {
     try {

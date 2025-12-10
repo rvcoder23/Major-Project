@@ -246,6 +246,178 @@ router.post('/generate/:bookingId', async (req, res) => {
     }
 });
 
+// Generate bill for food order (restaurant/direct billing) - updated for Batch Orders
+router.post('/generate/food/:orderId', async (req, res) => {
+    try {
+        // 1. Get initial order details to find order_number
+        const { data: initialOrder, error: initialError } = await supabase
+            .from('food_orders')
+            .select('order_number, id')
+            .eq('id', req.params.orderId)
+            .single();
+
+        if (initialError) throw initialError;
+
+        const orderNumber = initialOrder.order_number;
+
+        // 2. Fetch ALL orders with this order_number
+        const { data: allOrders, error: ordersError } = await supabase
+            .from('food_orders')
+            .select(`
+                *,
+                food_menu (
+                    item_name,
+                    category,
+                    price
+                )
+            `)
+            .eq('order_number', orderNumber);
+
+        if (ordersError) throw ordersError;
+
+        if (!allOrders || allOrders.length === 0) {
+            return res.status(404).json({ success: false, error: 'No orders found for this batch' });
+        }
+
+        // Check if bill already exists for this batch
+        // We check the first order's invoice_number. If set, return that bill.
+        if (allOrders[0].invoice_number) {
+            const { data: bill } = await supabase
+                .from('bills')
+                .select('*')
+                .eq('invoice_number', allOrders[0].invoice_number)
+                .single();
+
+            if (bill) {
+                const { data: items } = await supabase
+                    .from('bill_items')
+                    .select('*')
+                    .eq('bill_id', bill.id);
+
+                return res.json({ success: true, data: { ...bill, items: items || [], alreadyExists: true } });
+            }
+        }
+
+        const invoiceNumber = generateInvoiceNumber();
+        const billDate = new Date().toISOString().split('T')[0];
+        const billTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+
+        // 3. Aggregate Amounts
+        let totalSubtotal = 0;
+        let totalGstAmount = 0;
+        let totalBillAmount = 0;
+        const billItemsToAdd = [];
+
+        // Common details from first order (Customer, Payment Method, etc.)
+        const firstOrder = allOrders[0];
+
+        for (const order of allOrders) {
+            // Re-calculate or use stored values
+            // Trusting stored values slightly more but re-verifying amounts is safer.
+            // However, to ensure consistency with what was shown to user, let's use stored if possible?
+            // The stored 'total_amount' in food_orders includes GST. 
+            // We need base amount and GST amount separately for the bill if not strictly stored.
+
+            // Back-calculate or reuse logic
+            let price = order.food_menu?.price || 0;
+            if (order.plate_type === 'Half') {
+                price = Math.round(price * 0.6);
+            }
+            const qty = order.quantity || 1;
+
+            // Base amount for this item line
+            const lineBaseAmount = price * qty;
+
+            // GST
+            const rate = getGstRateForAmount(lineBaseAmount);
+            const lineGstAmount = Math.round(lineBaseAmount * rate * 100) / 100;
+            const lineTotal = lineBaseAmount + lineGstAmount;
+
+            totalSubtotal += lineBaseAmount;
+            totalGstAmount += lineGstAmount;
+            totalBillAmount += lineTotal;
+
+            billItemsToAdd.push({
+                item_type: 'Food',
+                item_description: `${order.food_menu?.item_name} (${order.plate_type})`,
+                quantity: qty,
+                unit_price: price,
+                base_amount: lineBaseAmount,
+                gst_rate: rate * 100,
+                gst_amount: lineGstAmount,
+                total_amount: lineTotal,
+                item_date: billDate,
+                reference_id: order.id
+            });
+        }
+
+        // 4. Create Bill Record
+        const billData = {
+            invoice_number: invoiceNumber,
+            booking_id: null,
+            guest_name: firstOrder.customer_name || 'Walk-in Customer',
+            guest_phone: null,
+            bill_date: billDate,
+            bill_time: billTime,
+            subtotal: totalSubtotal,
+            gst_rate: totalSubtotal > 0 ? (totalGstAmount / totalSubtotal * 100) : 0, // Average rate? Or just store 0 and rely on items?
+            // Actually schema expects a rate. Let's just put the predominant one or 0.12 * 100?
+            // Better to calculate effective rate.
+            gst_amount: Math.round(totalGstAmount * 100) / 100,
+            discount: 0,
+            total_amount: Math.round(totalBillAmount * 100) / 100,
+            payment_method: firstOrder.payment_method || 'Cash',
+            payment_status: 'Pending',
+            // If strictly needed matches frontend:
+            // payment_status: order.payment_status || 'Pending',
+            created_by: 'admin'
+        };
+
+        const { data: bill, error: billError } = await supabase
+            .from('bills')
+            .insert([billData])
+            .select()
+            .single();
+
+        if (billError) throw billError;
+
+        // 5. Add Bill Items related to the created bill
+        const itemsWithBillId = billItemsToAdd.map(item => ({
+            ...item,
+            bill_id: bill.id
+        }));
+
+        await supabase.from('bill_items').insert(itemsWithBillId);
+
+        // 6. Update ALL orders with invoice number
+        const orderIds = allOrders.map(o => o.id);
+        await supabase
+            .from('food_orders')
+            .update({ invoice_number: invoiceNumber })
+            .in('id', orderIds);
+
+        await logAction(`Food Bill generated: ${invoiceNumber} (${allOrders.length} items)`, 'admin', supabase);
+
+        // 7. Return complete bill
+        const { data: completeBill } = await supabase
+            .from('bills')
+            .select('*')
+            .eq('id', bill.id)
+            .single();
+
+        const { data: allItems } = await supabase
+            .from('bill_items')
+            .select('*')
+            .eq('bill_id', bill.id);
+
+        res.json({ success: true, data: { ...completeBill, items: allItems || [] } });
+
+    } catch (error) {
+        console.error('Error generating food bill:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Update bill payment
 router.patch('/:id/payment', [
     body('payment_method').optional().isIn(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']),

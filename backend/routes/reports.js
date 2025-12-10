@@ -92,11 +92,26 @@ router.get('/occupancy', async (req, res) => {
 // Get monthly revenue data
 router.get('/revenue', async (req, res) => {
     try {
+        const { startDate, endDate } = req.query;
+        let queryStartDate;
+        let queryEndDate;
+
+        if (startDate && endDate) {
+            queryStartDate = startDate;
+            // Adjust end date to include full day
+            queryEndDate = `${endDate}T23:59:59.999Z`;
+        } else {
+            // Default to current month
+            queryStartDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            queryEndDate = new Date().toISOString();
+        }
+
         const { data, error } = await supabase
             .from('accounts')
             .select('amount, created_at')
             .eq('type', 'Income')
-            .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+            .gte('created_at', queryStartDate)
+            .lte('created_at', queryEndDate);
 
         if (error) throw error;
 
@@ -126,6 +141,13 @@ router.get('/revenue', async (req, res) => {
 router.get('/comprehensive', async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
+        let queryStartDate = startDate || new Date().toISOString().split('T')[0];
+        let queryEndDate = endDate || new Date().toISOString().split('T')[0];
+
+        // Adjust endDate to include the full day
+        // We use string manipulation to ensure we cover the entire UTC day for the given date
+        // If queryEndDate is '2025-12-10', we want to search up to '2025-12-10T23:59:59.999Z'
+        const adjustedEndDate = `${queryEndDate}T23:59:59.999Z`;
 
         // Get bookings in date range
         const { data: bookingsData } = await supabase
@@ -137,15 +159,20 @@ router.get('/comprehensive', async (req, res) => {
           room_type
         )
       `)
-            .gte('check_in', startDate || new Date().toISOString().split('T')[0])
-            .lte('check_out', endDate || new Date().toISOString().split('T')[0]);
+            .gte('check_in', queryStartDate)
+            .lte('check_out', queryEndDate); // Bookings checking out ON that day are fine, usually check_out is the date. 
+        // Actually, for bookings, if check_out is the day, it's fine. 
+        // The logic for bookings might need review too but let's stick to Accounts first.
+        // If check_out is stored as date only, lte '2025-12-10' matches '2025-12-10'.
+        // If it's timestamp, we might need adjustedEndDate too. 
+        // Let's use adjustedEndDate for all to be safe for timestamps.
 
         // Get accounts in date range
         const { data: accountsData } = await supabase
             .from('accounts')
             .select('*')
-            .gte('created_at', startDate || new Date().toISOString().split('T')[0])
-            .lte('created_at', endDate || new Date().toISOString().split('T')[0]);
+            .gte('created_at', queryStartDate)
+            .lte('created_at', adjustedEndDate);
 
         // Get housekeeping data
         const { data: housekeepingData } = await supabase
@@ -156,8 +183,34 @@ router.get('/comprehensive', async (req, res) => {
           room_number
         )
       `)
-            .gte('cleaning_date', startDate || new Date().toISOString().split('T')[0])
-            .lte('cleaning_date', endDate || new Date().toISOString().split('T')[0]);
+            .gte('cleaning_date', queryStartDate)
+            .lte('cleaning_date', adjustedEndDate);
+
+        // Get food court orders in date range
+        const { data: foodOrdersData } = await supabase
+            .from('food_orders')
+            .select('*')
+            .gte('order_date', queryStartDate)
+            .lte('order_date', adjustedEndDate);
+
+        // Get inventory purchases in date range
+        const { data: inventoryPurchasesData } = await supabase
+            .from('purchases')
+            .select('total_cost')
+            .gte('purchase_date', queryStartDate)
+            .lte('purchase_date', adjustedEndDate);
+
+        // Get current inventory snapshot (for low stock and valuation)
+        const { data: inventoryData } = await supabase
+            .from('inventory')
+            .select('*');
+
+        // Get rooms added in date range
+        const { data: roomsAddedData } = await supabase
+            .from('rooms')
+            .select('*')
+            .gte('created_at', queryStartDate)
+            .lte('created_at', adjustedEndDate);
 
         const report = {
             bookings: {
@@ -175,6 +228,22 @@ router.get('/comprehensive', async (req, res) => {
                 totalTasks: housekeepingData?.length || 0,
                 completed: housekeepingData?.filter(h => h.status === 'Completed').length || 0,
                 pending: housekeepingData?.filter(h => h.status === 'Pending').length || 0
+            },
+            foodCourt: {
+                totalOrders: foodOrdersData?.length || 0,
+                totalRevenue: foodOrdersData?.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0) || 0,
+                served: foodOrdersData?.filter(o => o.status === 'Served').length || 0,
+                cancelled: foodOrdersData?.filter(o => o.status === 'Cancelled').length || 0
+            },
+            inventory: {
+                totalItems: inventoryData?.length || 0,
+                totalValuation: inventoryData?.reduce((sum, item) => sum + (parseFloat(item.price || 0) * parseInt(item.quantity || 0)), 0) || 0,
+                lowStockItems: inventoryData?.filter(item => item.quantity <= item.threshold).length || 0,
+                purchaseCost: inventoryPurchasesData?.reduce((sum, p) => sum + parseFloat(p.total_cost || 0), 0) || 0
+            },
+            rooms: {
+                added: roomsAddedData?.length || 0,
+                newRooms: roomsAddedData?.map(r => r.room_number) || []
             }
         };
 
