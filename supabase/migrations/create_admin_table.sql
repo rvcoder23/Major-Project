@@ -6,10 +6,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Insert default admin user (password: admin123)
--- Note: The hash below is for 'admin123' using bcrypt
 INSERT INTO admin_users (username, password_hash)
-VALUES ('admin', '$2a$10$X7.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1')
+VALUES ('admin', '$2a$10$U8xgMFxgHOhDB7DlPfOho.LCve2EQH1nmSU0j0vclTibAlEjynpfu')
 ON CONFLICT (username) DO NOTHING;
 
 -- Create index on username
