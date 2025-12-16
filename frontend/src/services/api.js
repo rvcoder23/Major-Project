@@ -114,6 +114,7 @@ export const foodAPI = {
 // Reports API
 export const reportsAPI = {
     getDashboard: () => api.get('/reports/dashboard'),
+    getDashboardLive: () => api.get('/reports/dashboard/live'),
     getOccupancy: (period = '7') => api.get(`/reports/occupancy?period=${period}`),
     getRevenue: (startDate, endDate) => {
         let qs = '';

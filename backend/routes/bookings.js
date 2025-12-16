@@ -131,6 +131,25 @@ router.post('/', [
             });
         }
 
+        // Occupancy threshold protection
+        const occupancyThreshold = Number(process.env.BOOKING_OCCUPANCY_THRESHOLD || 0.95);
+        const { data: roomStatusData, error: roomStatusErr } = await supabase
+            .from('rooms')
+            .select('status');
+
+        if (roomStatusErr) throw roomStatusErr;
+
+        const totalRooms = roomStatusData?.length || 0;
+        const occupiedRooms = roomStatusData?.filter(r => r.status === 'Occupied' || r.status === 'Cleaning').length || 0;
+        const projectedOccupancy = totalRooms === 0 ? 0 : (occupiedRooms + 1) / totalRooms; // include this booking
+
+        if (totalRooms > 0 && projectedOccupancy > occupancyThreshold) {
+            return res.status(409).json({
+                success: false,
+                error: 'Hotel occupancy threshold reached. Cannot create new booking right now.'
+            });
+        }
+
         // Calculate total amount
         const { data: roomData } = await supabase
             .from('rooms')
@@ -272,7 +291,7 @@ router.patch('/:id/checkout', async (req, res) => {
         // Get booking details
         const { data: booking } = await supabase
             .from('bookings')
-            .select('room_id')
+            .select('room_id, check_out')
             .eq('id', req.params.id)
             .single();
 
@@ -294,6 +313,41 @@ router.patch('/:id/checkout', async (req, res) => {
             .from('rooms')
             .update({ status: 'Cleaning' })
             .eq('id', booking.room_id);
+
+        // Auto-create housekeeping task after checkout to reduce manual work
+        const today = new Date().toISOString().split('T')[0];
+
+        // Find the next booking for this room to set task priority
+        const { data: nextBooking } = await supabase
+            .from('bookings')
+            .select('check_in')
+            .eq('room_id', booking.room_id)
+            .neq('booking_status', 'Cancelled')
+            .gt('check_in', today)
+            .order('check_in', { ascending: true })
+            .limit(1)
+            .single();
+
+        let priority = 'Medium';
+        if (nextBooking?.check_in) {
+            const nextDate = new Date(nextBooking.check_in);
+            const checkoutDate = new Date(booking.check_out);
+            const diffHours = (nextDate - checkoutDate) / (1000 * 60 * 60);
+            if (diffHours <= 4) priority = 'Urgent';
+            else if (diffHours <= 24) priority = 'High';
+        }
+
+        await supabase
+            .from('housekeeping')
+            .insert([{
+                room_id: booking.room_id,
+                task_type: 'Regular Cleaning',
+                priority,
+                status: 'Pending',
+                cleaning_date: today,
+                inspection_status: 'Pending',
+                special_instructions: 'Auto-created after checkout'
+            }]);
 
         await logAction(`Booking checked out: ${req.params.id}`, 'admin', supabase);
         res.json({ success: true, data });

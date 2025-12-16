@@ -32,15 +32,16 @@ import { formatCurrency } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
-    const { data: dashboardData, isLoading: loading, isError, error } = useQuery({
-        queryKey: ['dashboard'],
+    const { data: dashboardData, isLoading: loading, isError, error, dataUpdatedAt } = useQuery({
+        queryKey: ['dashboard-live'],
         queryFn: async () => {
-            const [kpisRes, occupancyRes, revenueRes, checkinsRes, checkoutsRes] = await Promise.all([
+            const [kpisRes, occupancyRes, revenueRes, checkinsRes, checkoutsRes, liveRes] = await Promise.all([
                 reportsAPI.getDashboard(),
                 reportsAPI.getOccupancy('7'),
                 reportsAPI.getRevenue(),
                 bookingsAPI.getTodayCheckins(),
-                bookingsAPI.getTodayCheckouts()
+                bookingsAPI.getTodayCheckouts(),
+                reportsAPI.getDashboardLive()
             ]);
 
             return {
@@ -48,12 +49,16 @@ const Dashboard = () => {
                 occupancy: occupancyRes.data || [],
                 revenue: revenueRes.data || [],
                 checkins: checkinsRes.data || [],
-                checkouts: checkoutsRes.data || []
+                checkouts: checkoutsRes.data || [],
+                live: liveRes.data || {}
             };
-        }
+        },
+        refetchInterval: 30000,
+        staleTime: 15000
     });
 
     const kpis = dashboardData?.kpis;
+    const live = dashboardData?.live || {};
     const occupancyData = dashboardData?.occupancy || [];
     const revenueData = dashboardData?.revenue || [];
     const todayCheckins = dashboardData?.checkins || [];
@@ -86,13 +91,13 @@ const Dashboard = () => {
         },
         {
             title: 'Pending Cleaning',
-            value: kpis?.pendingCleaning || 0,
+            value: live.pendingCleaning ?? kpis?.pendingCleaning ?? 0,
             icon: Clock,
             color: 'bg-red-500'
         },
         {
             title: "Today's Check-ins",
-            value: kpis?.todayCheckins || 0,
+            value: live.todayCheckins ?? kpis?.todayCheckins ?? 0,
             icon: Calendar,
             color: 'bg-indigo-500'
         }
@@ -137,8 +142,25 @@ const Dashboard = () => {
                     </p>
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Last updated: {new Date().toLocaleString()}
+                    Live refresh every 30s • Last updated: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : '–'}
                 </div>
+            </div>
+
+            {/* Alerts */}
+            <div className="grid grid-cols-1 gap-3">
+                {(live.alerts?.length || 0) === 0 ? (
+                    <div className="flex items-center text-sm text-green-700 bg-green-50 border border-green-100 rounded-md px-3 py-2">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        All clear. No active alerts.
+                    </div>
+                ) : (
+                    live.alerts.map((alert, idx) => (
+                        <div key={idx} className="flex items-center text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            {alert}
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* KPI Cards */}

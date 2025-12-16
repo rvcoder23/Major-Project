@@ -50,6 +50,81 @@ router.get('/dashboard', async (req, res) => {
     }
 });
 
+// Live dashboard metrics (lightweight, polled every 30-60s)
+router.get('/dashboard/live', async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+
+        // Use settled promises so a missing table/column does not break the endpoint
+        const [
+            roomsResult,
+            checkinsResult,
+            foodResult,
+            inventoryResult,
+            paymentResult,
+            cleaningResult
+        ] = await Promise.allSettled([
+            supabase.from('rooms').select('status'),
+            supabase.from('bookings').select('id').eq('check_in', today).eq('booking_status', 'Active'),
+            supabase.from('food_orders').select('id, status').in('status', ['Pending', 'Preparing']),
+            supabase.from('inventory').select('item_name, quantity, threshold'),
+            supabase.from('bookings').select('id').eq('payment_status', 'Failed'),
+            supabase.from('housekeeping').select('*')
+        ]);
+
+        const roomsData = roomsResult.status === 'fulfilled' ? roomsResult.value.data : [];
+        const todayCheckins = checkinsResult.status === 'fulfilled' ? checkinsResult.value.data : [];
+        const foodOrders = foodResult.status === 'fulfilled' ? foodResult.value.data : [];
+        const inventoryData = inventoryResult.status === 'fulfilled' ? inventoryResult.value.data : [];
+        const failedPayments = paymentResult.status === 'fulfilled' ? paymentResult.value.data : [];
+        const cleaningTasks = cleaningResult.status === 'fulfilled' ? cleaningResult.value.data : [];
+
+        const lowStock = (inventoryData || []).filter(item => {
+            const qty = Number(item.quantity) || 0;
+            const threshold = Number(item.threshold) || 0;
+            return qty <= threshold;
+        });
+
+        const roomStatus = {
+            total: roomsData?.length || 0,
+            available: roomsData?.filter(r => r.status === 'Available').length || 0,
+            occupied: roomsData?.filter(r => r.status === 'Occupied').length || 0,
+            maintenance: roomsData?.filter(r => r.status === 'Maintenance').length || 0,
+            cleaning: roomsData?.filter(r => r.status === 'Cleaning').length || 0
+        };
+
+        const stuckCleaning = (cleaningTasks || []).filter(task => {
+            if (!task || !['Pending', 'In Progress'].includes(task.status)) return false;
+            const startTime = task.started_at ? new Date(task.started_at) : (task.created_at ? new Date(task.created_at) : new Date(task.cleaning_date));
+            const hoursOpen = startTime ? (now - startTime) / (1000 * 60 * 60) : 0;
+            return hoursOpen >= 4; // stuck more than 4 hours
+        });
+
+        const alerts = [];
+        if ((lowStock?.length || 0) > 0) alerts.push('Low inventory items need restock');
+        if ((stuckCleaning?.length || 0) > 0) alerts.push('Some rooms stuck in Cleaning for over 4 hours');
+        if ((failedPayments?.length || 0) > 0) alerts.push('There are failed payments to review');
+
+        res.json({
+            success: true,
+            data: {
+                roomStatus,
+                todayCheckins: todayCheckins?.length || 0,
+                pendingCleaning: roomStatus.cleaning,
+                newFoodOrders: foodOrders?.length || 0,
+                lowStockCount: lowStock?.length || 0,
+                paymentFailed: failedPayments?.length || 0,
+                cleaningStuck: stuckCleaning?.length || 0,
+                alerts
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching live dashboard metrics:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Get weekly occupancy data
 router.get('/occupancy', async (req, res) => {
     try {

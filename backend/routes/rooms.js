@@ -143,6 +143,42 @@ router.patch('/:id/status', [
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
+        // Enforce room status rules
+        if (req.body.status === 'Available') {
+            // Block making room available if cleaning/inspection is pending
+            const { data: pendingTasks, error: housekeepingErr } = await supabase
+                .from('housekeeping')
+                .select('id, status, inspection_status')
+                .eq('room_id', req.params.id)
+                .in('status', ['Pending', 'In Progress']);
+
+            if (housekeepingErr) throw housekeepingErr;
+
+            const hasPendingCleaning = pendingTasks?.length > 0 || pendingTasks?.some(t => t.inspection_status !== 'Approved');
+            if (hasPendingCleaning) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Room has pending cleaning/inspection. Complete housekeeping before marking Available.'
+                });
+            }
+        }
+
+        if (req.body.status === 'Occupied') {
+            // Prevent occupying rooms that are under maintenance or cleaning
+            const { data: roomCurrent } = await supabase
+                .from('rooms')
+                .select('status')
+                .eq('id', req.params.id)
+                .single();
+
+            if (roomCurrent?.status === 'Maintenance' || roomCurrent?.status === 'Cleaning') {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Cannot occupy a room that is under maintenance or cleaning.'
+                });
+            }
+        }
+
         const { data, error } = await supabase
             .from('rooms')
             .update({ status: req.body.status })
