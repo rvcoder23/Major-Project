@@ -68,6 +68,11 @@ export const housekeepingAPI = {
     getTodayReport: () => api.get('/housekeeping/today/report'),
     getDashboardStats: () => api.get('/housekeeping/dashboard/stats'),
     getStaff: () => api.get('/housekeeping/staff/list'),
+    getActiveStaff: () => api.get('/housekeeping/staff/active'),
+    getStaffById: (id) => api.get(`/housekeeping/staff/${id}`),
+    createStaff: (data) => api.post('/housekeeping/staff', data),
+    updateStaff: (id, data) => api.put(`/housekeeping/staff/${id}`, data),
+    deleteStaff: (id) => api.delete(`/housekeeping/staff/${id}`),
     delete: (id) => api.delete(`/housekeeping/${id}`),
 };
 

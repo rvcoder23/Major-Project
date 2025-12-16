@@ -606,8 +606,25 @@ router.get('/today/report', async (req, res) => {
     }
 });
 
-// Get housekeeping staff
+// Get housekeeping staff (all statuses)
 router.get('/staff/list', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('housekeeping_staff')
+            .select('*')
+            .order('staff_name');
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error fetching housekeeping staff:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get active housekeeping staff only
+router.get('/staff/active', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('housekeeping_staff')
@@ -619,7 +636,143 @@ router.get('/staff/list', async (req, res) => {
 
         res.json({ success: true, data });
     } catch (error) {
-        console.error('Error fetching housekeeping staff:', error);
+        console.error('Error fetching active housekeeping staff:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get staff by ID
+router.get('/staff/:id', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('housekeeping_staff')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error fetching staff:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create new staff member
+router.post('/staff', [
+    body('staff_name').notEmpty().withMessage('Staff name is required'),
+    body('employee_id').optional().isString(),
+    body('designation').optional().isString(),
+    body('status').optional().isIn(['Active', 'On Leave', 'Inactive']),
+    body('shift').optional().isIn(['Day', 'Night', 'Flexible'])
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
+
+        const staffData = {
+            staff_name: req.body.staff_name,
+            employee_id: req.body.employee_id || null,
+            phone_number: req.body.phone_number || null,
+            email: req.body.email || null,
+            designation: req.body.designation || 'Housekeeping Staff',
+            shift: req.body.shift || 'Day',
+            status: req.body.status || 'Active',
+            specialization: req.body.specialization || null,
+            performance_rating: req.body.performance_rating || 0.00,
+            updated_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+            .from('housekeeping_staff')
+            .insert([staffData])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await logAction(`Housekeeping staff created: ${data.staff_name}`, 'admin', supabase);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error creating staff:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update staff member
+router.put('/staff/:id', [
+    body('status').optional().isIn(['Active', 'On Leave', 'Inactive']),
+    body('shift').optional().isIn(['Day', 'Night', 'Flexible'])
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
+
+        const updateData = {
+            updated_at: new Date().toISOString()
+        };
+
+        const allowedFields = [
+            'staff_name', 'employee_id', 'phone_number', 'email',
+            'designation', 'shift', 'status', 'specialization', 'performance_rating'
+        ];
+
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        });
+
+        const { data, error } = await supabase
+            .from('housekeeping_staff')
+            .update(updateData)
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await logAction(`Housekeeping staff updated: ${data.staff_name}`, 'admin', supabase);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error updating staff:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete staff member
+router.delete('/staff/:id', async (req, res) => {
+    try {
+        // Check if staff has assigned tasks
+        const { data: assignedTasks } = await supabase
+            .from('housekeeping')
+            .select('id')
+            .eq('assigned_staff_id', req.params.id)
+            .in('status', ['Pending', 'In Progress']);
+
+        if (assignedTasks && assignedTasks.length > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                error: `Cannot delete staff member with ${assignedTasks.length} active task(s). Please reassign tasks first.` 
+            });
+        }
+
+        const { error } = await supabase
+            .from('housekeeping_staff')
+            .delete()
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+
+        await logAction(`Housekeeping staff deleted: ${req.params.id}`, 'admin', supabase);
+        res.json({ success: true, message: 'Staff member deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting staff:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
