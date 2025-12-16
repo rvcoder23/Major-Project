@@ -123,6 +123,20 @@ hotel-management/
 - Charts और analytics
 - PDF/Excel export functionality
 
+## 🚀 Deployment
+
+For detailed deployment instructions, see:
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Complete step-by-step guide
+- **[DEPLOYMENT_QUICK_START.md](./DEPLOYMENT_QUICK_START.md)** - Quick 15-minute guide
+- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - Deployment checklist
+
+### Quick Deployment Overview:
+1. **Database**: Deploy to Supabase (free tier available)
+2. **Backend**: Deploy to Render/Railway (free tier available)
+3. **Frontend**: Deploy to Vercel/Netlify (free tier available)
+
+All platforms offer free tiers suitable for small projects!
+
 ## 📝 Notes
 
 - यह एक college project है
