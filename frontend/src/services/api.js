@@ -39,6 +39,7 @@ export const roomsAPI = {
     update: (id, data) => api.put(`/rooms/${id}`, data),
     delete: (id) => api.delete(`/rooms/${id}`),
     getAvailable: () => api.get('/rooms/available/rooms'),
+    getOccupied: () => api.get('/rooms/occupied/rooms'),
     updateStatus: (id, status) => api.patch(`/rooms/${id}/status`, { status }),
 };
 

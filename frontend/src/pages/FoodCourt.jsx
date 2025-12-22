@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Utensils, Plus, Search, ShoppingCart, Receipt, ChefHat, Edit, Trash2, Clock, CheckCircle, XCircle, Eye, IndianRupee } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { foodAPI, bookingsAPI, billsAPI } from '../services/api';
+import { foodAPI, bookingsAPI, billsAPI, roomsAPI } from '../services/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -132,10 +132,13 @@ const FoodCourt = () => {
     });
 
     const [paymentMethods, setPaymentMethods] = useState(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']);
+    const [occupiedRooms, setOccupiedRooms] = useState([]);
+    const [editingMenuItem, setEditingMenuItem] = useState(null);
 
     useEffect(() => {
         fetchAll();
         fetchPaymentMethods();
+        fetchOccupiedRooms();
     }, []);
 
     useEffect(() => {
@@ -150,6 +153,17 @@ const FoodCourt = () => {
             }
         } catch (error) {
             console.error('Error fetching payment methods:', error);
+        }
+    };
+
+    const fetchOccupiedRooms = async () => {
+        try {
+            const response = await roomsAPI.getOccupied();
+            if (response.success && Array.isArray(response.data)) {
+                setOccupiedRooms(response.data);
+            }
+        } catch (error) {
+            console.error('Error fetching occupied rooms:', error);
         }
     };
 
@@ -237,12 +251,14 @@ const FoodCourt = () => {
 
     const openMenuModal = (item = null) => {
         if (item) {
+            setEditingMenuItem(item);
             setMenuForm({
                 item_name: item.item_name,
                 category: item.category,
                 price: item.price
             });
         } else {
+            setEditingMenuItem(null);
             setMenuForm({
                 item_name: '',
                 category: '',
@@ -250,6 +266,32 @@ const FoodCourt = () => {
             });
         }
         setShowMenuModal(true);
+    };
+
+    const handleMenuSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            if (editingMenuItem) {
+                // Update existing menu item
+                const res = await foodAPI.updateMenuItem(editingMenuItem.id, menuForm);
+                if (res.success) {
+                    toast.success('Menu item updated successfully');
+                    setShowMenuModal(false);
+                    fetchAll();
+                }
+            } else {
+                // Create new menu item
+                const res = await foodAPI.createMenuItem(menuForm);
+                if (res.success) {
+                    toast.success('Menu item added successfully');
+                    setShowMenuModal(false);
+                    fetchAll();
+                }
+            }
+        } catch (err) {
+            console.error('Error saving menu item:', err);
+            toast.error(err?.response?.data?.error || 'Failed to save menu item');
+        }
     };
 
     const [cartItems, setCartItems] = useState([]);
@@ -607,9 +649,12 @@ const FoodCourt = () => {
                                         <h3 className="font-semibold text-gray-900 dark:text-white">{item.item_name}</h3>
                                         <div className="flex space-x-1">
                                             <button
-                                                onClick={() => openOrderModal(item)}
+                                                onClick={() => {
+                                                    openOrderModal();
+                                                    setTimeout(() => addToCart(item), 100);
+                                                }}
                                                 className="p-1 text-green-600 hover:text-green-800 dark:text-green-400"
-                                                title="Add to Order"
+                                                title="Quick Order"
                                             >
                                                 <Plus className="h-4 w-4" />
                                             </button>
@@ -854,7 +899,9 @@ const FoodCourt = () => {
             {showMenuModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Menu Item</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                            {editingMenuItem ? 'Edit Menu Item' : 'Add Menu Item'}
+                        </h2>
                         <form onSubmit={handleMenuSubmit}>
                             <div className="space-y-4">
                                 <div>
@@ -959,14 +1006,19 @@ const FoodCourt = () => {
                                     disabled={isEditMode}
                                 />
                             ) : (
-                                <input
-                                    type="number"
-                                    placeholder="Room No."
+                                <select
                                     value={orderForm.room_number}
                                     onChange={(e) => setOrderForm({ ...orderForm, room_number: e.target.value })}
                                     className="px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
                                     disabled={isEditMode}
-                                />
+                                >
+                                    <option value="">Room No.</option>
+                                    {occupiedRooms.map(room => (
+                                        <option key={room.id} value={room.room_number}>
+                                            Room {room.room_number} - {room.room_type}
+                                        </option>
+                                    ))}
+                                </select>
                             )}
 
                             <select

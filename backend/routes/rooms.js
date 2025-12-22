@@ -133,6 +133,24 @@ router.get('/available/rooms', async (req, res) => {
     }
 });
 
+// Get occupied rooms
+router.get('/occupied/rooms', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('rooms')
+            .select('*')
+            .eq('status', 'Occupied')
+            .order('room_number');
+
+        if (error) throw error;
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error fetching occupied rooms:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Update room status
 router.patch('/:id/status', [
     body('status').isIn(['Available', 'Occupied', 'Maintenance', 'Cleaning']).withMessage('Invalid status')
