@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Utensils, Plus, Search, ShoppingCart, Receipt, ChefHat, Edit, Trash2, Clock, CheckCircle, XCircle, Eye, IndianRupee } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { foodAPI, bookingsAPI, billsAPI, roomsAPI } from '../services/api';
+import { foodAPI, bookingsAPI, billsAPI, roomsAPI, mealPlansAPI } from '../services/api';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -122,7 +122,9 @@ const FoodCourt = () => {
         table_number: 1,
         plate_type: 'Full',
         payment_method: 'Cash',
-        order_type: 'Restaurant'
+        order_type: 'Restaurant',
+        meal_type: '',
+        guest_number: 1
     });
     const [orderCalculation, setOrderCalculation] = useState({
         baseAmount: 0,
@@ -134,6 +136,9 @@ const FoodCourt = () => {
     const [paymentMethods, setPaymentMethods] = useState(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']);
     const [occupiedRooms, setOccupiedRooms] = useState([]);
     const [editingMenuItem, setEditingMenuItem] = useState(null);
+    const [selectedBooking, setSelectedBooking] = useState(null);
+    const [mealEligibility, setMealEligibility] = useState(null);
+    const [loadingMealPlan, setLoadingMealPlan] = useState(false);
 
     useEffect(() => {
         fetchAll();
@@ -143,7 +148,7 @@ const FoodCourt = () => {
 
     useEffect(() => {
         calculateOrderAmount();
-    }, [orderForm.item_id, orderForm.quantity, orderForm.plate_type, menuItems]);
+    }, [orderForm.item_id, orderForm.quantity, orderForm.plate_type, orderForm.meal_type, menuItems, mealEligibility]);
 
     const fetchPaymentMethods = async () => {
         try {
@@ -164,6 +169,76 @@ const FoodCourt = () => {
             }
         } catch (error) {
             console.error('Error fetching occupied rooms:', error);
+        }
+    };
+
+    const fetchBookingForRoom = async (roomNumber) => {
+        if (!roomNumber) {
+            setSelectedBooking(null);
+            setMealEligibility(null);
+            return;
+        }
+
+        try {
+            setLoadingMealPlan(true);
+            // Find the room to get room_id
+            const room = occupiedRooms.find(r => r.room_number === parseInt(roomNumber));
+            if (!room) {
+                setSelectedBooking(null);
+                setMealEligibility(null);
+                return;
+            }
+
+            // Fetch active booking for this room
+            const bookingsRes = await bookingsAPI.getAll();
+            if (bookingsRes.success) {
+                const activeBooking = bookingsRes.data.find(
+                    b => b.room_id === room.id && b.booking_status === 'Active'
+                );
+
+                if (activeBooking) {
+                    setSelectedBooking(activeBooking);
+                    // Auto-check eligibility if meal_type is already selected
+                    if (orderForm.meal_type) {
+                        await checkMealEligibility(activeBooking.id, orderForm.guest_number, orderForm.meal_type);
+                    }
+                } else {
+                    setSelectedBooking(null);
+                    setMealEligibility(null);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching booking:', error);
+            setSelectedBooking(null);
+            setMealEligibility(null);
+        } finally {
+            setLoadingMealPlan(false);
+        }
+    };
+
+    const checkMealEligibility = async (bookingId, guestNumber, mealType) => {
+        if (!bookingId || !mealType || mealType === 'Snack') {
+            setMealEligibility(null);
+            return;
+        }
+
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const res = await mealPlansAPI.checkEligibility(bookingId, {
+                guest_number: guestNumber || 1,
+                meal_type: mealType,
+                date: today
+            });
+
+            if (res.success) {
+                setMealEligibility({
+                    eligible: res.eligible,
+                    reason: res.reason
+                });
+            }
+        } catch (error) {
+            console.error('Error checking meal eligibility:', error);
+            setMealEligibility(null);
         }
     };
 
@@ -189,7 +264,12 @@ const FoodCourt = () => {
         const baseAmount = unitPrice * orderForm.quantity;
         const gstRate = calculateGstRate(baseAmount);
         const gstAmount = Math.round(baseAmount * (gstRate / 100) * 100) / 100;
-        const totalAmount = Math.round((baseAmount + gstAmount) * 100) / 100;
+
+        // If meal is eligible and included in plan, total is 0
+        let totalAmount = Math.round((baseAmount + gstAmount) * 100) / 100;
+        if (mealEligibility && mealEligibility.eligible) {
+            totalAmount = 0;
+        }
 
         setOrderCalculation({
             baseAmount,
@@ -382,8 +462,15 @@ const FoodCourt = () => {
                             table_number: first.table_number || '',
                             room_number: first.room_number || '',
                             order_type: first.order_type,
-                            payment_method: first.payment_method
+                            payment_method: first.payment_method,
+                            meal_type: first.meal_type || '',
+                            guest_number: first.guest_number || 1
                         });
+
+                        // Fetch booking if room service
+                        if (first.order_type === 'Room Service' && first.room_number) {
+                            await fetchBookingForRoom(first.room_number);
+                        }
                     }
                 }
             } catch (err) {
@@ -399,8 +486,12 @@ const FoodCourt = () => {
                 plate_type: 'Full', // Default
                 payment_method: 'Cash',
                 order_type: 'Restaurant',
-                room_number: ''
+                room_number: '',
+                meal_type: '',
+                guest_number: 1
             });
+            setSelectedBooking(null);
+            setMealEligibility(null);
         }
         setShowOrderModal(true);
     };
@@ -459,6 +550,15 @@ const FoodCourt = () => {
                         plate_type: item.plate_type || 'Full'
                     }))
                 };
+
+                // Add meal plan fields for room service
+                if (orderForm.order_type === 'Room Service' && selectedBooking) {
+                    payload.booking_id = selectedBooking.id;
+                    payload.guest_number = orderForm.guest_number || 1;
+                    if (orderForm.meal_type) {
+                        payload.meal_type = orderForm.meal_type;
+                    }
+                }
 
                 const res = await foodAPI.createBatchOrder(payload);
                 if (res.success) {
@@ -750,9 +850,17 @@ const FoodCourt = () => {
                                                     <td className="py-3 px-4 text-gray-900 dark:text-white text-sm max-w-xs">
                                                         <div className="flex flex-col gap-1">
                                                             {group.items.slice(0, 3).map((item, idx) => (
-                                                                <span key={idx} className="truncate">
-                                                                    {item.quantity}x {item.food_menu?.item_name || 'Item'}
-                                                                </span>
+                                                                <div key={idx} className="flex items-center gap-2">
+                                                                    <span className="truncate">
+                                                                        {item.quantity}x {item.food_menu?.item_name || 'Item'}
+                                                                    </span>
+                                                                    {item.is_meal_plan_included && (
+                                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 whitespace-nowrap">
+                                                                            <CheckCircle className="h-3 w-3 mr-0.5" />
+                                                                            Included
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             ))}
                                                             {group.items.length > 3 && (
                                                                 <span className="text-xs text-gray-500">+{group.items.length - 3} more...</span>
@@ -760,7 +868,16 @@ const FoodCourt = () => {
                                                         </div>
                                                     </td>
                                                     <td className="py-3 px-4 text-gray-900 dark:text-white font-bold">
-                                                        ₹{group.total.toFixed(2)}
+                                                        {group.items.some(i => i.is_meal_plan_included) ? (
+                                                            <div className="flex flex-col">
+                                                                <span className="text-green-600 dark:text-green-400">₹{group.total.toFixed(2)}</span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    {group.items.filter(i => i.is_meal_plan_included).length} included
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            `₹${group.total.toFixed(2)}`
+                                                        )}
                                                     </td>
                                                     <td className="py-3 px-4">
                                                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(displayStatus)}`}>
@@ -1008,7 +1125,10 @@ const FoodCourt = () => {
                             ) : (
                                 <select
                                     value={orderForm.room_number}
-                                    onChange={(e) => setOrderForm({ ...orderForm, room_number: e.target.value })}
+                                    onChange={(e) => {
+                                        setOrderForm({ ...orderForm, room_number: e.target.value });
+                                        fetchBookingForRoom(e.target.value);
+                                    }}
                                     className="px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
                                     disabled={isEditMode}
                                 >
@@ -1032,6 +1152,93 @@ const FoodCourt = () => {
                                 ))}
                             </select>
                         </div>
+
+                        {/* Meal Plan Section for Room Service */}
+                        {orderForm.order_type === 'Room Service' && selectedBooking && (
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Guest Meal Plan
+                                        </p>
+                                        <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                            {selectedBooking.meal_plan_config?.plan_name || selectedBooking.meal_plan}
+                                        </p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            {selectedBooking.number_of_guests} guest{selectedBooking.number_of_guests > 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Meal Type
+                                        </label>
+                                        <select
+                                            value={orderForm.meal_type}
+                                            onChange={(e) => {
+                                                setOrderForm({ ...orderForm, meal_type: e.target.value });
+                                                if (e.target.value) {
+                                                    checkMealEligibility(selectedBooking.id, orderForm.guest_number, e.target.value);
+                                                } else {
+                                                    setMealEligibility(null);
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                        >
+                                            <option value="">Select Meal Type</option>
+                                            <option value="Breakfast">Breakfast</option>
+                                            <option value="Lunch">Lunch</option>
+                                            <option value="Dinner">Dinner</option>
+                                            <option value="Snack">Snack</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Guest Number
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max={selectedBooking.number_of_guests}
+                                            value={orderForm.guest_number}
+                                            onChange={(e) => {
+                                                setOrderForm({ ...orderForm, guest_number: e.target.value });
+                                                if (orderForm.meal_type) {
+                                                    checkMealEligibility(selectedBooking.id, e.target.value, orderForm.meal_type);
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Meal Eligibility Status */}
+                                {loadingMealPlan && (
+                                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                                        Checking meal plan...
+                                    </div>
+                                )}
+                                {mealEligibility && (
+                                    <div className={`mt-3 p-3 rounded-lg ${mealEligibility.eligible
+                                        ? 'bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700'
+                                        : 'bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700'
+                                        }`}>
+                                        <p className={`text-sm font-medium ${mealEligibility.eligible
+                                            ? 'text-green-800 dark:text-green-300'
+                                            : 'text-yellow-800 dark:text-yellow-300'
+                                            }`}>
+                                            {mealEligibility.eligible ? '✓ Included in Meal Plan' : '⚠ ' + mealEligibility.reason}
+                                        </p>
+                                        {mealEligibility.eligible && (
+                                            <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                                                This meal will be marked as ₹0 (covered by plan)
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Main Content: Split View */}
                         <div className="flex-1 flex overflow-hidden">

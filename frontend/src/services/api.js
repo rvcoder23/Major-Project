@@ -49,7 +49,9 @@ export const bookingsAPI = {
     getById: (id) => api.get(`/bookings/${id}`),
     create: (data) => api.post('/bookings', data),
     update: (id, data) => api.put(`/bookings/${id}`, data),
-    cancel: (id) => api.patch(`/bookings/${id}/cancel`),
+    checkin: (id) => api.post(`/bookings/${id}/checkin`),
+    cancel: (id) => api.post(`/bookings/${id}/cancel`),
+    noShow: (id) => api.post(`/bookings/${id}/no-show`),
     checkout: (id) => api.patch(`/bookings/${id}/checkout`),
     getTodayCheckins: () => api.get('/bookings/today/checkins'),
     getTodayCheckouts: () => api.get('/bookings/today/checkouts'),
@@ -148,6 +150,36 @@ export const billsAPI = {
 export const settingsAPI = {
     getNotifications: () => api.get('/settings/notifications'),
     updateNotifications: (data) => api.put('/settings/notifications', data),
+};
+
+// Meal Plans API
+export const mealPlansAPI = {
+    getAll: () => api.get('/meal-plans'),
+    getByType: (planType) => api.get(`/meal-plans/${planType}`),
+    getEntitlements: (bookingId) => api.get(`/meal-plans/${bookingId}/entitlements`),
+    checkEligibility: (bookingId, data) => api.post(`/meal-plans/${bookingId}/check-eligibility`, data),
+    useEntitlement: (bookingId, data) => api.patch(`/meal-plans/${bookingId}/use-entitlement`, data),
+    getSummary: (bookingId) => api.get(`/meal-plans/${bookingId}/summary`),
+};
+
+// Staff API
+export const staffAPI = {
+    getAll: (params) => api.get('/staff', { params }),
+    getById: (id) => api.get(`/staff/${id}`),
+    create: (data) => api.post('/staff', data),
+    update: (id, data) => api.put(`/staff/${id}`, data),
+    delete: (id) => api.delete(`/staff/${id}`),
+    getByShift: (shiftCode) => api.get(`/staff/shift/${shiftCode}`),
+    getCurrentShift: () => api.get('/staff/current/shift'),
+};
+
+// Handovers API
+export const handoversAPI = {
+    getAll: (params) => api.get('/handovers', { params }),
+    getCurrent: () => api.get('/handovers/current'),
+    generate: (data) => api.post('/handovers/generate', data),
+    acknowledge: (id, data) => api.post(`/handovers/${id}/acknowledge`, data),
+    getByDate: (date) => api.get(`/handovers/date/${date}`),
 };
 
 export default api;

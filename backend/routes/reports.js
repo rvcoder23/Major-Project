@@ -331,4 +331,167 @@ router.get('/comprehensive', async (req, res) => {
     }
 });
 
+// Get meal plan revenue summary
+router.get('/meal-plan-summary', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const today = new Date().toISOString().split('T')[0];
+        const start = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+        const end = endDate || today;
+
+        // Get all bookings with meal plans in date range
+        const { data: bookings, error } = await supabase
+            .from('bookings')
+            .select('meal_plan, meal_plan_cost, number_of_guests, check_in, check_out')
+            .gte('check_in', start)
+            .lte('check_out', end);
+
+        if (error) throw error;
+
+        // Calculate summary statistics
+        const summary = {
+            total_bookings: bookings.length,
+            total_revenue: 0,
+            by_plan_type: {
+                EP: { count: 0, revenue: 0, guests: 0 },
+                CP: { count: 0, revenue: 0, guests: 0 },
+                MAP: { count: 0, revenue: 0, guests: 0 },
+                AP: { count: 0, revenue: 0, guests: 0 }
+            },
+            average_meal_plan_cost: 0,
+            total_guests: 0
+        };
+
+        bookings.forEach(booking => {
+            const plan = booking.meal_plan || 'EP';
+            const cost = Number(booking.meal_plan_cost) || 0;
+            const guests = Number(booking.number_of_guests) || 1;
+
+            summary.total_revenue += cost;
+            summary.total_guests += guests;
+
+            if (summary.by_plan_type[plan]) {
+                summary.by_plan_type[plan].count++;
+                summary.by_plan_type[plan].revenue += cost;
+                summary.by_plan_type[plan].guests += guests;
+            }
+        });
+
+        summary.average_meal_plan_cost = summary.total_bookings > 0
+            ? Math.round((summary.total_revenue / summary.total_bookings) * 100) / 100
+            : 0;
+
+        // Calculate most popular plan
+        let mostPopular = 'EP';
+        let maxCount = 0;
+        Object.keys(summary.by_plan_type).forEach(plan => {
+            if (summary.by_plan_type[plan].count > maxCount) {
+                maxCount = summary.by_plan_type[plan].count;
+                mostPopular = plan;
+            }
+        });
+        summary.most_popular_plan = mostPopular;
+
+        res.json({ success: true, data: summary });
+    } catch (error) {
+        console.error('Error fetching meal plan summary:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get meal entitlement utilization
+router.get('/meal-utilization', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const today = new Date().toISOString().split('T')[0];
+        const start = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+        const end = endDate || today;
+
+        // Get all entitlements in date range
+        const { data: entitlements, error } = await supabase
+            .from('meal_entitlements')
+            .select('*')
+            .gte('entitlement_date', start)
+            .lte('entitlement_date', end);
+
+        if (error) throw error;
+
+        const stats = {
+            total_entitlements: entitlements.length,
+            total_possible_meals: entitlements.length * 3, // B, L, D
+            breakfast_used: 0,
+            lunch_used: 0,
+            dinner_used: 0,
+            total_meals_used: 0,
+            utilization_rate: 0,
+            wastage_count: 0
+        };
+
+        entitlements.forEach(ent => {
+            if (ent.breakfast_used) stats.breakfast_used++;
+            if (ent.lunch_used) stats.lunch_used++;
+            if (ent.dinner_used) stats.dinner_used++;
+        });
+
+        stats.total_meals_used = stats.breakfast_used + stats.lunch_used + stats.dinner_used;
+        stats.utilization_rate = stats.total_possible_meals > 0
+            ? Math.round((stats.total_meals_used / stats.total_possible_meals) * 10000) / 100
+            : 0;
+        stats.wastage_count = stats.total_possible_meals - stats.total_meals_used;
+
+        res.json({ success: true, data: stats });
+    } catch (error) {
+        console.error('Error fetching meal utilization:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get meal plan trends (daily breakdown)
+router.get('/meal-plan-trends', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const today = new Date().toISOString().split('T')[0];
+        const start = startDate || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+        const end = endDate || today;
+
+        // Get bookings grouped by date and meal plan
+        const { data: bookings, error } = await supabase
+            .from('bookings')
+            .select('meal_plan, meal_plan_cost, check_in')
+            .gte('check_in', start)
+            .lte('check_in', end)
+            .order('check_in');
+
+        if (error) throw error;
+
+        // Group by date
+        const trends = {};
+        bookings.forEach(booking => {
+            const date = booking.check_in.split('T')[0];
+            if (!trends[date]) {
+                trends[date] = {
+                    date,
+                    EP: 0, CP: 0, MAP: 0, AP: 0,
+                    total_bookings: 0,
+                    total_revenue: 0
+                };
+            }
+
+            const plan = booking.meal_plan || 'EP';
+            trends[date][plan]++;
+            trends[date].total_bookings++;
+            trends[date].total_revenue += Number(booking.meal_plan_cost) || 0;
+        });
+
+        const trendsArray = Object.values(trends).sort((a, b) =>
+            new Date(a.date) - new Date(b.date)
+        );
+
+        res.json({ success: true, data: trendsArray });
+    } catch (error) {
+        console.error('Error fetching meal plan trends:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

@@ -11,6 +11,7 @@ import {
     Clock,
     CheckCircle,
     AlertCircle,
+    AlertTriangle,
     BarChart3
 } from 'lucide-react';
 import {
@@ -35,13 +36,14 @@ const Dashboard = () => {
     const { data: dashboardData, isLoading: loading, isError, error, dataUpdatedAt } = useQuery({
         queryKey: ['dashboard-live'],
         queryFn: async () => {
-            const [kpisRes, occupancyRes, revenueRes, checkinsRes, checkoutsRes, liveRes] = await Promise.all([
+            const [kpisRes, occupancyRes, revenueRes, checkinsRes, checkoutsRes, liveRes, allBookingsRes] = await Promise.all([
                 reportsAPI.getDashboard(),
                 reportsAPI.getOccupancy('7'),
                 reportsAPI.getRevenue(),
                 bookingsAPI.getTodayCheckins(),
                 bookingsAPI.getTodayCheckouts(),
-                reportsAPI.getDashboardLive()
+                reportsAPI.getDashboardLive(),
+                bookingsAPI.getAll()
             ]);
 
             return {
@@ -50,7 +52,8 @@ const Dashboard = () => {
                 revenue: revenueRes.data || [],
                 checkins: checkinsRes.data || [],
                 checkouts: checkoutsRes.data || [],
-                live: liveRes.data || {}
+                live: liveRes.data || {},
+                allBookings: allBookingsRes.data || []
             };
         },
         refetchInterval: 30000,
@@ -63,6 +66,16 @@ const Dashboard = () => {
     const revenueData = dashboardData?.revenue || [];
     const todayCheckins = dashboardData?.checkins || [];
     const todayCheckouts = dashboardData?.checkouts || [];
+    const allBookings = dashboardData?.allBookings || [];
+
+    const overstayBookings = allBookings.filter(booking => {
+        if (booking.booking_status !== 'Checked-In') return false;
+        const checkOutDate = new Date(booking.check_out);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        checkOutDate.setHours(0, 0, 0, 0);
+        return checkOutDate < today;
+    });
 
     const kpiCards = [
         {
@@ -162,6 +175,32 @@ const Dashboard = () => {
                     ))
                 )}
             </div>
+
+            {/* Overstay Alerts */}
+            {overstayBookings.length > 0 && (
+                <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg">
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div className="ml-3 w-full">
+                            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                                Overstay Alert: {overstayBookings.length} Guest(s) Exceeded Check-out Date
+                            </h3>
+                            <div className="mt-2 text-sm text-red-700 dark:text-red-400">
+                                <ul className="list-disc pl-5 space-y-1">
+                                    {overstayBookings.map(booking => (
+                                        <li key={booking.id}>
+                                            <span className="font-semibold">{booking.guest_name}</span> (Room {booking.rooms?.room_number})
+                                            - Check-out was: {new Date(booking.check_out).toLocaleDateString()}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

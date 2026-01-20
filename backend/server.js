@@ -18,6 +18,9 @@ const reportsRoutes = require('./routes/reports');
 const billsRoutes = require('./routes/bills');
 const authRoutes = require('./routes/auth');
 const settingsRoutes = require('./routes/settings');
+const mealPlansRoutes = require('./routes/mealPlans');
+const staffRoutes = require('./routes/staff');
+const handoversRoutes = require('./routes/handovers');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,7 +28,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' 
+    origin: process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
         ? '*' // Allow all in production if FRONTEND_URL not set
         : [
             'http://localhost:3000',
@@ -61,6 +64,9 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/bills', billsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/meal-plans', mealPlansRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/handovers', handoversRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

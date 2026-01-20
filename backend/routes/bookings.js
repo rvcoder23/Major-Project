@@ -31,6 +31,11 @@ router.get('/', async (req, res) => {
           room_number,
           room_type,
           rate_per_night
+        ),
+        meal_plan_config (
+          plan_name,
+          description,
+          cost_per_person_per_day
         )
       `)
             .order('created_at', { ascending: false });
@@ -55,6 +60,11 @@ router.get('/:id', async (req, res) => {
           room_number,
           room_type,
           rate_per_night
+        ),
+        meal_plan_config (
+          plan_name,
+          description,
+          cost_per_person_per_day
         )
       `)
             .eq('id', req.params.id)
@@ -74,6 +84,7 @@ router.post('/', [
     body('first_name').notEmpty().withMessage('First name is required'),
     body('last_name').notEmpty().withMessage('Last name is required'),
     body('phone_number').matches(/^[0-9]{10}$/).withMessage('Phone number must be exactly 10 digits'),
+    body('email').optional().isEmail().withMessage('Valid email address is required'),
     body('aadhar_number').matches(/^[0-9]{12}$/).withMessage('Valid 12-digit Aadhar number is required'),
     body('room_id').isInt().withMessage('Room ID must be a number'),
     body('check_in').isISO8601().withMessage('Check-in date is required'),
@@ -81,7 +92,9 @@ router.post('/', [
     body('registration_card_printout').optional().isBoolean(),
     body('vip_category').optional().isIn(['VIP', 'CIP', 'VVIP']),
     body('booking_notes').optional().isString(),
-    body('payment_method').optional().isIn(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer'])
+    body('payment_method').optional().isIn(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']),
+    body('meal_plan').optional().isIn(['EP', 'CP', 'MAP', 'AP']).withMessage('Invalid meal plan'),
+    body('number_of_guests').optional().isInt({ min: 1 }).withMessage('Number of guests must be at least 1')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -160,7 +173,29 @@ router.post('/', [
         const checkIn = new Date(checkInStr);
         const checkOut = new Date(checkOutStr);
         const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-        const baseAmount = nights * roomData.rate_per_night;
+        const roomBaseAmount = nights * roomData.rate_per_night;
+
+        // Meal plan calculation
+        const mealPlan = req.body.meal_plan || 'EP';
+        const numberOfGuests = req.body.number_of_guests || 1;
+        let mealPlanCost = 0;
+
+        if (mealPlan !== 'EP') {
+            // Fetch meal plan pricing
+            const { data: mealPlanConfig } = await supabase
+                .from('meal_plan_config')
+                .select('cost_per_person_per_day')
+                .eq('plan_type', mealPlan)
+                .single();
+
+            if (mealPlanConfig) {
+                mealPlanCost = mealPlanConfig.cost_per_person_per_day * numberOfGuests * nights;
+                mealPlanCost = Math.round(mealPlanCost * 100) / 100;
+            }
+        }
+
+        // Base amount includes room + meal plan (before GST)
+        const baseAmount = roomBaseAmount + mealPlanCost;
 
         // GST calculation based on base amount (total before tax)
         // 12% for 0-5499, 18% for 5500-7499, 28% for 7500+
@@ -178,9 +213,13 @@ router.post('/', [
             gst_rate: gstRateDecimal * 100, // store as percentage (e.g. 12, 18, 28)
             gst_amount: gstAmount,
             payment_method: req.body.payment_method || 'Cash',
+            booking_status: 'Reserved', // New reservations start as 'Reserved'
             registration_card_printout: req.body.registration_card_printout ?? false,
             vip_category: req.body.vip_category || null,
-            booking_notes: req.body.booking_notes || null
+            booking_notes: req.body.booking_notes || null,
+            meal_plan: mealPlan,
+            number_of_guests: numberOfGuests,
+            meal_plan_cost: mealPlanCost
         };
 
         const { data, error } = await supabase
@@ -192,8 +231,70 @@ router.post('/', [
           room_number,
           room_type,
           rate_per_night
+        ),
+        meal_plan_config (
+          plan_name,
+          description
         )
       `)
+            .single();
+
+        if (error) throw error;
+
+        // Update room status to Reserved (not Occupied until check-in)
+        await supabase
+            .from('rooms')
+            .update({ status: 'Reserved' })
+            .eq('id', req.body.room_id);
+
+        // Note: Meal entitlements will be generated on actual check-in, not reservation
+        // This prevents generating entitlements for cancelled or no-show reservations
+
+        await logAction(`Reservation created for ${bookingData.guest_name} with ${mealPlan} meal plan`, 'admin', supabase);
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error('Error creating booking:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Check-in guest (when they actually arrive)
+router.post('/:id/checkin', async (req, res) => {
+    try {
+        // Get booking details
+        const { data: booking, error: fetchError } = await supabase
+            .from('bookings')
+            .select('*, rooms(*)')
+            .eq('id', req.params.id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        if (!booking) {
+            return res.status(404).json({ success: false, error: 'Booking not found' });
+        }
+
+        if (booking.booking_status !== 'Reserved') {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot check-in. Booking status is ${booking.booking_status}`
+            });
+        }
+
+        const now = new Date();
+        const actualCheckinDate = now.toISOString().split('T')[0];
+        const actualCheckinTime = now.toTimeString().split(' ')[0];
+
+        // Update booking to Checked-In
+        const { data, error } = await supabase
+            .from('bookings')
+            .update({
+                booking_status: 'Checked-In',
+                actual_checkin_date: actualCheckinDate,
+                actual_checkin_time: actualCheckinTime
+            })
+            .eq('id', req.params.id)
+            .select()
             .single();
 
         if (error) throw error;
@@ -202,12 +303,121 @@ router.post('/', [
         await supabase
             .from('rooms')
             .update({ status: 'Occupied' })
-            .eq('id', req.body.room_id);
+            .eq('id', booking.room_id);
 
-        await logAction(`Booking created for ${req.body.guest_name}`, 'admin', supabase);
-        res.json({ success: true, data });
+        // Generate meal entitlements if meal plan is not EP
+        if (booking.meal_plan && booking.meal_plan !== 'EP') {
+            try {
+                await supabase.rpc('generate_meal_entitlements', {
+                    p_booking_id: booking.id,
+                    p_check_in: booking.check_in,
+                    p_check_out: booking.check_out,
+                    p_number_of_guests: booking.number_of_guests || 1
+                });
+            } catch (entitlementError) {
+                console.error('Error generating meal entitlements:', entitlementError);
+                // Don't fail check-in if entitlement generation fails
+            }
+        }
+
+        await logAction(`Guest checked-in: ${booking.guest_name} - Room ${booking.rooms?.room_number}`, 'admin', supabase);
+        res.json({ success: true, data, message: 'Guest checked-in successfully' });
     } catch (error) {
-        console.error('Error creating booking:', error);
+        console.error('Error checking in guest:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Cancel reservation
+router.post('/:id/cancel', async (req, res) => {
+    try {
+        // Get booking details
+        const { data: booking, error: fetchError } = await supabase
+            .from('bookings')
+            .select('*, rooms(*)')
+            .eq('id', req.params.id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        if (!booking) {
+            return res.status(404).json({ success: false, error: 'Booking not found' });
+        }
+
+        if (booking.booking_status !== 'Reserved') {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot cancel. Booking status is ${booking.booking_status}`
+            });
+        }
+
+        // Update booking to Cancelled
+        const { data, error } = await supabase
+            .from('bookings')
+            .update({ booking_status: 'Cancelled' })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Update room status back to Available
+        await supabase
+            .from('rooms')
+            .update({ status: 'Available' })
+            .eq('id', booking.room_id);
+
+        await logAction(`Reservation cancelled: ${booking.guest_name} - Room ${booking.rooms?.room_number}`, 'admin', supabase);
+        res.json({ success: true, data, message: 'Reservation cancelled successfully' });
+    } catch (error) {
+        console.error('Error cancelling reservation:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Mark as No-Show
+router.post('/:id/no-show', async (req, res) => {
+    try {
+        // Get booking details
+        const { data: booking, error: fetchError } = await supabase
+            .from('bookings')
+            .select('*, rooms(*)')
+            .eq('id', req.params.id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        if (!booking) {
+            return res.status(404).json({ success: false, error: 'Booking not found' });
+        }
+
+        if (booking.booking_status !== 'Reserved') {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot mark as no-show. Booking status is ${booking.booking_status}`
+            });
+        }
+
+        // Update booking to No-Show
+        const { data, error } = await supabase
+            .from('bookings')
+            .update({ booking_status: 'No-Show' })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Update room status back to Available
+        await supabase
+            .from('rooms')
+            .update({ status: 'Available' })
+            .eq('id', booking.room_id);
+
+        await logAction(`Marked as no-show: ${booking.guest_name} - Room ${booking.rooms?.room_number}`, 'admin', supabase);
+        res.json({ success: true, data, message: 'Booking marked as no-show' });
+    } catch (error) {
+        console.error('Error marking as no-show:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

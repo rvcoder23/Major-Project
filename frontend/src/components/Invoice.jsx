@@ -240,31 +240,122 @@ const Invoice = ({ bill, onClose }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {bill.items?.map((item, index) => (
-                                    <tr key={index} className={index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'}>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                            {item.item_description}
-                                        </td>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-center text-gray-900 dark:text-white">
-                                            {item.quantity}
-                                        </td>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            Rs. {item.unit_price.toFixed(2)}
-                                        </td>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            Rs. {item.base_amount.toFixed(2)}
-                                        </td>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            {item.gst_rate.toFixed(2)}%
-                                        </td>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                            Rs. {item.gst_amount.toFixed(2)}
-                                        </td>
-                                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
-                                            Rs. {item.total_amount.toFixed(2)}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {/* Accommodation Section */}
+                                {bill.items?.filter(item => item.item_type === 'Room' || item.item_type === 'Meal Plan').length > 0 && (
+                                    <>
+                                        <tr className="bg-blue-100 dark:bg-blue-900">
+                                            <td colSpan="7" className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-bold text-gray-900 dark:text-white">
+                                                ACCOMMODATION
+                                            </td>
+                                        </tr>
+                                        {bill.items?.filter(item => item.item_type === 'Room' || item.item_type === 'Meal Plan').map((item, index) => (
+                                            <tr key={`accom-${index}`} className="bg-white dark:bg-gray-800">
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                    {item.item_description}
+                                                    {item.item_type === 'Meal Plan' && (
+                                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                                            Meal Plan
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-center text-gray-900 dark:text-white">
+                                                    {item.quantity}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    Rs. {item.unit_price.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    Rs. {item.base_amount.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    {item.gst_rate.toFixed(2)}%
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    Rs. {item.gst_amount.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
+                                                    Rs. {item.total_amount.toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* Food & Beverage - Included Section */}
+                                {bill.items?.filter(item => item.item_type === 'Food (Included)').length > 0 && (
+                                    <>
+                                        <tr className="bg-green-100 dark:bg-green-900">
+                                            <td colSpan="7" className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-bold text-gray-900 dark:text-white">
+                                                FOOD & BEVERAGE - INCLUDED IN MEAL PLAN
+                                            </td>
+                                        </tr>
+                                        {bill.items?.filter(item => item.item_type === 'Food (Included)').map((item, index) => (
+                                            <tr key={`included-${index}`} className="bg-green-50 dark:bg-green-900/20">
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                    {item.item_description}
+                                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                                        Included
+                                                    </span>
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-center text-gray-900 dark:text-white">
+                                                    {item.quantity}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-500 dark:text-gray-400 line-through">
+                                                    Rs. {item.unit_price.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-green-600 dark:text-green-400 font-medium">
+                                                    Rs. 0.00
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    0%
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-green-600 dark:text-green-400 font-medium">
+                                                    Rs. 0.00
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400">
+                                                    Rs. 0.00
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* Food & Beverage - Additional Section */}
+                                {bill.items?.filter(item => item.item_type === 'Food' && !item.is_meal_plan_included).length > 0 && (
+                                    <>
+                                        <tr className="bg-yellow-100 dark:bg-yellow-900">
+                                            <td colSpan="7" className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-bold text-gray-900 dark:text-white">
+                                                FOOD & BEVERAGE - ADDITIONAL CHARGES
+                                            </td>
+                                        </tr>
+                                        {bill.items?.filter(item => item.item_type === 'Food' && !item.is_meal_plan_included).map((item, index) => (
+                                            <tr key={`food-${index}`} className="bg-white dark:bg-gray-800">
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                    {item.item_description}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-center text-gray-900 dark:text-white">
+                                                    {item.quantity}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    Rs. {item.unit_price.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    Rs. {item.base_amount.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    {item.gst_rate.toFixed(2)}%
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                    Rs. {item.gst_amount.toFixed(2)}
+                                                </td>
+                                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
+                                                    Rs. {item.total_amount.toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
+                                )}
                             </tbody>
                         </table>
                     </div>

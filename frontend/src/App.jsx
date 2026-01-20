@@ -11,6 +11,7 @@ import FoodCourt from './pages/FoodCourt';
 import Accounts from './pages/Accounts';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import ShiftHandover from './pages/ShiftHandover';
 import Layout from './components/Layout';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
                             <Route path="/accounts" element={<Accounts />} />
                             <Route path="/reports" element={<Reports />} />
                             <Route path="/settings" element={<Settings />} />
+                            <Route path="/handover" element={<ShiftHandover />} />
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                         </Routes>
                     </Layout>

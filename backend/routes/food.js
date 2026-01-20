@@ -143,7 +143,10 @@ router.post('/orders', [
     body('room_number').optional({ nullable: true }).isInt().withMessage('Room number must be a number'),
     body('order_type').optional().isIn(['Restaurant', 'Room Service']).withMessage('Order type must be Restaurant or Room Service'),
     body('plate_type').optional().isIn(['Half', 'Full']).withMessage('Plate type must be Half or Full'),
-    body('payment_method').optional().isIn(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer'])
+    body('payment_method').optional().isIn(['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Cheque', 'Bank Transfer']),
+    body('booking_id').optional().isInt().withMessage('Booking ID must be a number'),
+    body('guest_number').optional().isInt({ min: 1 }).withMessage('Guest number must be at least 1'),
+    body('meal_type').optional().isIn(['Breakfast', 'Lunch', 'Dinner', 'Snack']).withMessage('Invalid meal type')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -187,6 +190,9 @@ router.post('/orders', [
         const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         // Validate room number if order type is Room Service
+        let roomId = null;
+        let bookingId = req.body.booking_id || null;
+
         if (req.body.order_type === 'Room Service' && req.body.room_number) {
             const { data: room, error: roomError } = await supabase
                 .from('rooms')
@@ -207,6 +213,56 @@ router.post('/orders', [
                     errors: [{ msg: `Room ${req.body.room_number} is not currently occupied.` }]
                 });
             }
+
+            roomId = room.id;
+
+            // If booking_id not provided, try to find active booking for this room
+            if (!bookingId) {
+                const { data: activeBooking } = await supabase
+                    .from('bookings')
+                    .select('id, meal_plan, number_of_guests')
+                    .eq('room_id', roomId)
+                    .eq('booking_status', 'Active')
+                    .single();
+
+                if (activeBooking) {
+                    bookingId = activeBooking.id;
+                }
+            }
+        }
+
+        // Meal plan integration
+        let isMealPlanIncluded = false;
+        const guestNumber = req.body.guest_number || 1;
+        const mealType = req.body.meal_type || null;
+        const today = new Date().toISOString().split('T')[0];
+
+        // Check meal eligibility if booking_id and meal_type are provided
+        if (bookingId && mealType && mealType !== 'Snack') {
+            try {
+                const { data: eligibilityData } = await supabase.rpc('check_meal_eligibility', {
+                    p_booking_id: bookingId,
+                    p_guest_number: guestNumber,
+                    p_meal_type: mealType,
+                    p_date: today
+                });
+
+                if (eligibilityData && eligibilityData.length > 0) {
+                    const eligibility = eligibilityData[0];
+                    if (eligibility.eligible) {
+                        isMealPlanIncluded = true;
+                    }
+                }
+            } catch (eligibilityError) {
+                console.error('Error checking meal eligibility:', eligibilityError);
+                // Continue with order even if eligibility check fails
+            }
+        }
+
+        // Adjust total amount if meal is included in plan
+        let finalTotalAmount = totalAmount;
+        if (isMealPlanIncluded) {
+            finalTotalAmount = 0; // Meal is covered by plan
         }
 
         const orderData = {
@@ -216,14 +272,18 @@ router.post('/orders', [
             base_amount: baseAmount,
             gst_rate: gstRateDecimal * 100,
             gst_amount: gstAmount,
-            total_amount: totalAmount,
+            total_amount: finalTotalAmount,
             customer_name: req.body.customer_name,
             table_number: req.body.table_number,
             room_number: req.body.room_number || null,
             order_type: req.body.order_type || 'Restaurant',
             plate_type: req.body.plate_type || 'Full',
             payment_method: req.body.payment_method || 'Cash',
-            status: 'Pending'
+            status: 'Pending',
+            booking_id: bookingId,
+            guest_number: guestNumber,
+            is_meal_plan_included: isMealPlanIncluded,
+            meal_type: mealType
         };
 
         const { data, error } = await supabase
@@ -241,7 +301,28 @@ router.post('/orders', [
 
         if (error) throw error;
 
-        await logAction(`Order created: ${orderNumber}`, 'admin', supabase);
+        // Mark meal entitlement as used if included in plan
+        if (isMealPlanIncluded && bookingId && mealType) {
+            try {
+                const updateField = `${mealType.toLowerCase()}_used`;
+                const updateTimeField = `${mealType.toLowerCase()}_used_at`;
+
+                await supabase
+                    .from('meal_entitlements')
+                    .update({
+                        [updateField]: true,
+                        [updateTimeField]: new Date().toISOString()
+                    })
+                    .eq('booking_id', bookingId)
+                    .eq('guest_number', guestNumber)
+                    .eq('entitlement_date', today);
+            } catch (entitlementError) {
+                console.error('Error updating meal entitlement:', entitlementError);
+                // Don't fail the order if entitlement update fails
+            }
+        }
+
+        await logAction(`Order created: ${orderNumber}${isMealPlanIncluded ? ' (Meal Plan Included)' : ''}`, 'admin', supabase);
         res.json({ success: true, data });
     } catch (error) {
         console.error('Error creating order:', error);
@@ -344,7 +425,7 @@ router.post('/orders/batch', [
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
-        const { items, customer_name, table_number, room_number, order_type, payment_method } = req.body;
+        const { items, customer_name, table_number, room_number, order_type, payment_method, booking_id, guest_number, meal_type } = req.body;
 
         const orderRows = [];
         const failedItems = [];
@@ -409,7 +490,11 @@ router.post('/orders/batch', [
                 order_type: order_type || 'Restaurant',
                 plate_type: item.plate_type || 'Full',
                 payment_method: payment_method || 'Cash',
-                status: 'Pending'
+                status: 'Pending',
+                booking_id: booking_id || null,
+                guest_number: guest_number || 1,
+                meal_type: meal_type || null,
+                is_meal_plan_included: false // Will be set by backend trigger if applicable
             });
         }
 

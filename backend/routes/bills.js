@@ -85,6 +85,10 @@ router.post('/generate/:bookingId', async (req, res) => {
                     room_number,
                     room_type,
                     rate_per_night
+                ),
+                meal_plan_config (
+                    plan_name,
+                    cost_per_person_per_day
                 )
             `)
             .eq('id', req.params.bookingId)
@@ -132,20 +136,24 @@ router.post('/generate/:bookingId', async (req, res) => {
                 const gstAmount = order.gst_amount || (baseAmount * gstRate);
                 const itemTotal = baseAmount + gstAmount;
 
-                foodSubtotal += baseAmount;
-                foodGstTotal += gstAmount;
+                // Only add to subtotal if NOT included in meal plan
+                if (!order.is_meal_plan_included) {
+                    foodSubtotal += baseAmount;
+                    foodGstTotal += gstAmount;
+                }
 
                 foodItems.push({
-                    item_type: 'Food',
-                    item_description: `${order.food_menu?.item_name || 'Food Item'} (${order.plate_type || 'Full'})`,
+                    item_type: order.is_meal_plan_included ? 'Food (Included)' : 'Food',
+                    item_description: `${order.food_menu?.item_name || 'Food Item'} (${order.plate_type || 'Full'})${order.is_meal_plan_included ? ' - Included in Meal Plan' : ''}`,
                     quantity: order.quantity || 1,
                     unit_price: baseAmount / (order.quantity || 1),
-                    base_amount: baseAmount,
+                    base_amount: order.is_meal_plan_included ? 0 : baseAmount,
                     gst_rate: gstRate * 100,
-                    gst_amount: gstAmount,
-                    total_amount: itemTotal,
+                    gst_amount: order.is_meal_plan_included ? 0 : gstAmount,
+                    total_amount: order.is_meal_plan_included ? 0 : itemTotal,
                     item_date: new Date(order.order_date).toISOString().split('T')[0],
-                    reference_id: order.id
+                    reference_id: order.id,
+                    is_meal_plan_included: order.is_meal_plan_included || false
                 });
             });
         }
@@ -208,6 +216,25 @@ router.post('/generate/:bookingId', async (req, res) => {
         };
 
         await supabase.from('bill_items').insert([roomItem]);
+
+        // Add meal plan as separate bill item if applicable
+        if (booking.meal_plan && booking.meal_plan !== 'EP' && booking.meal_plan_cost > 0) {
+            const mealPlanItem = {
+                bill_id: bill.id,
+                item_type: 'Meal Plan',
+                item_description: `Meal Plan - ${booking.meal_plan_config?.plan_name || booking.meal_plan} (${booking.number_of_guests} guest(s) × ${nights} night(s))`,
+                quantity: booking.number_of_guests * nights,
+                unit_price: booking.meal_plan_config?.cost_per_person_per_day || 0,
+                base_amount: booking.meal_plan_cost,
+                gst_rate: 0, // Meal plan cost already included in room GST calculation
+                gst_amount: 0,
+                total_amount: booking.meal_plan_cost,
+                item_date: booking.check_in,
+                reference_id: booking.id
+            };
+
+            await supabase.from('bill_items').insert([mealPlanItem]);
+        }
 
         // Add food items
         if (foodItems.length > 0) {
